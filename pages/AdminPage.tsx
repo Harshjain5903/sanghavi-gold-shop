@@ -6,8 +6,8 @@ import { useFilterOptions } from '../context/FilterOptionsContext';
 import { Product, NavItem, ProductSpecification } from '../types';
 import { MegaMenuSection } from '../types';
 import { 
-  Plus, Edit2, Trash2, Save, Loader, 
-  LayoutDashboard, Package, LogOut, Search, 
+    Plus, Edit2, Trash2, Save, Loader, 
+    LayoutDashboard, Package, LogOut, Search, ArrowUpDown,
   ChevronRight, ChevronDown, ChevronUp, Image as ImageIcon,
   AlertCircle, Layers, List, CheckCircle, Store, FolderPlus,
     Settings, X, Tag, TrendingUp, Sparkles, MinusCircle, UploadCloud, Filter,
@@ -906,6 +906,13 @@ const AdminPage: React.FC = () => {
             </button>
 
             <button 
+                onClick={() => setActiveTab('sort')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'sort' ? 'bg-gold-50 text-gold-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+                <ArrowUpDown size={18} /> Sort Options
+            </button>
+
+            <button 
                 onClick={() => setActiveTab('collections')}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'collections' ? 'bg-gold-50 text-gold-700' : 'text-gray-600 hover:bg-gray-50'}`}
             >
@@ -1182,62 +1189,6 @@ const AdminPage: React.FC = () => {
                         </button>
                      </div>
                  </div>
-                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
-                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-                         <div>
-                             <h3 className="text-lg font-bold text-gray-900">Sort Options Manager</h3>
-                             <p className="text-xs text-gray-500">These appear on the Collections page for customers.</p>
-                         </div>
-                         <div className="flex gap-3">
-                             <button onClick={handleSaveSortOptions} className="bg-brand-black text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-gold-600 transition">
-                                 <Save size={14} /> Save Sort Options
-                             </button>
-                             <button onClick={resetSortOptions} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-gray-50 transition">
-                                 <RefreshCw size={14} /> Reset Defaults
-                             </button>
-                         </div>
-                     </div>
-                     <div className="space-y-3">
-                         {localSortOptions.length === 0 ? (
-                             <p className="text-sm text-gray-500">No sort options configured.</p>
-                         ) : (
-                             localSortOptions.map((option, idx) => (
-                                 <div key={`${option}-${idx}`} className="flex items-center gap-3 p-2 rounded-lg border border-gray-100">
-                                     <div className="flex flex-col">
-                                         <button type="button" onClick={() => moveSortOption(idx, 'up')} className="p-1 text-gray-400 hover:text-gold-600" disabled={idx === 0}>
-                                             <ChevronUp size={16} />
-                                         </button>
-                                         <button type="button" onClick={() => moveSortOption(idx, 'down')} className="p-1 text-gray-400 hover:text-gold-600" disabled={idx === localSortOptions.length - 1}>
-                                             <ChevronDown size={16} />
-                                         </button>
-                                     </div>
-                                     <input
-                                         type="text"
-                                         value={option}
-                                         onChange={(e) => updateSortOption(idx, e.target.value)}
-                                         className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
-                                         placeholder="Sort option label"
-                                     />
-                                     <button type="button" onClick={() => removeSortOption(idx)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
-                                         <Trash2 size={16} />
-                                     </button>
-                                 </div>
-                             ))
-                         )}
-                     </div>
-                     <div className="flex flex-col md:flex-row gap-3 mt-4">
-                         <input
-                             type="text"
-                             value={newSortOption}
-                             onChange={(e) => setNewSortOption(e.target.value)}
-                             placeholder="Add new sort option"
-                             className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
-                         />
-                         <button onClick={addSortOption} className="bg-gold-500 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-gold-600 transition">
-                             <Plus size={14} /> Add Option
-                         </button>
-                     </div>
-                 </div>
                  <div className="space-y-4">
                      {localCategories.map((cat, catIndex) => (
                          <div 
@@ -1408,6 +1359,72 @@ const AdminPage: React.FC = () => {
                          />
                          <button onClick={addFilterSection} className="bg-gold-500 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-gold-600 transition">
                              <Plus size={14} /> Add Section
+                         </button>
+                     </div>
+                 </div>
+             </div>
+        )}
+
+        {/* VIEW: SORT OPTIONS */}
+        {activeTab === 'sort' && (
+             <div className="max-w-4xl mx-auto animate-fade-in-up pb-20">
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                     <div>
+                        <button onClick={() => setActiveTab('dashboard')} className="md:hidden flex items-center gap-1 text-gray-500 text-sm font-medium mb-4">
+                            <ChevronRight size={16} className="rotate-180"/> Back to Dashboard
+                        </button>
+                        <h2 className="text-2xl font-bold text-gray-900">Sort Options</h2>
+                        <p className="text-gray-500 text-sm mt-1">Manage the sort order shown on Collections.</p>
+                     </div>
+                     <div className="flex gap-3 w-full md:w-auto">
+                        <button onClick={handleSaveSortOptions} className="flex-1 md:flex-none bg-brand-black text-white px-5 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-gold-600 transition shadow-lg text-sm">
+                            <Save size={18} /> Save Sort Options
+                        </button>
+                        <button onClick={resetSortOptions} className="flex-1 md:flex-none border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-gray-50 transition text-sm">
+                            <RefreshCw size={18} /> Reset Defaults
+                        </button>
+                     </div>
+                 </div>
+
+                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                     <div className="space-y-3">
+                         {localSortOptions.length === 0 ? (
+                             <p className="text-sm text-gray-500">No sort options configured.</p>
+                         ) : (
+                             localSortOptions.map((option, idx) => (
+                                 <div key={`${option}-${idx}`} className="flex items-center gap-3 p-2 rounded-lg border border-gray-100">
+                                     <div className="flex flex-col">
+                                         <button type="button" onClick={() => moveSortOption(idx, 'up')} className="p-1 text-gray-400 hover:text-gold-600" disabled={idx === 0}>
+                                             <ChevronUp size={16} />
+                                         </button>
+                                         <button type="button" onClick={() => moveSortOption(idx, 'down')} className="p-1 text-gray-400 hover:text-gold-600" disabled={idx === localSortOptions.length - 1}>
+                                             <ChevronDown size={16} />
+                                         </button>
+                                     </div>
+                                     <input
+                                         type="text"
+                                         value={option}
+                                         onChange={(e) => updateSortOption(idx, e.target.value)}
+                                         className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                         placeholder="Sort option label"
+                                     />
+                                     <button type="button" onClick={() => removeSortOption(idx)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                         <Trash2 size={16} />
+                                     </button>
+                                 </div>
+                             ))
+                         )}
+                     </div>
+                     <div className="flex flex-col md:flex-row gap-3 mt-4">
+                         <input
+                             type="text"
+                             value={newSortOption}
+                             onChange={(e) => setNewSortOption(e.target.value)}
+                             placeholder="Add new sort option"
+                             className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                         />
+                         <button onClick={addSortOption} className="bg-gold-500 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-gold-600 transition">
+                             <Plus size={14} /> Add Option
                          </button>
                      </div>
                  </div>
