@@ -8,15 +8,16 @@ import { MegaMenuSection } from '../types';
 import { 
     Plus, Edit2, Trash2, Save, Loader, 
     LayoutDashboard, Package, LogOut, Search, ArrowUpDown,
-  ChevronRight, ChevronDown, ChevronUp, Image as ImageIcon,
-  AlertCircle, Layers, List, CheckCircle, Store, FolderPlus,
+    ChevronRight, ChevronDown, ChevronUp, Image as ImageIcon,
+    AlertCircle, Layers, List, CheckCircle, Store, FolderPlus,
     Settings, X, Tag, TrendingUp, Sparkles, MinusCircle, UploadCloud, Filter,
-  Megaphone, RefreshCw, GripVertical, Crown, ShieldAlert, Lock, Menu,
-  EyeOff, Type
+    Megaphone, RefreshCw, GripVertical, Crown, Menu, Type
 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { storage } from '../lib/firebase';
+import { useNavigate } from 'react-router-dom';
+import { storage, auth, db } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
 
@@ -68,12 +69,12 @@ const AdminPage: React.FC = () => {
     const { sortOptions, saveSortOptions, resetToDefault: resetSortOptions } = useSortOptions();
     const { filterSections, saveFilterSections, resetToDefault: resetFilterOptions } = useFilterOptions();
   
-  // --- SECURITY STATE ---
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [attempts, setAttempts] = useState(0);
-  const [isLocked, setIsLocked] = useState(false);
-  const [shake, setShake] = useState(false); // For animation
+    // --- ADMIN AUTH STATE ---
+    const [adminEmail, setAdminEmail] = useState('');
+    const [adminPassword, setAdminPassword] = useState('');
+    const [authLoading, setAuthLoading] = useState(true);
+    const [authError, setAuthError] = useState('');
+    const [isAdmin, setIsAdmin] = useState(false);
   
   // --- MAIN APP STATE ---
     const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'add' | 'edit' | 'categories' | 'filters' | 'trending' | 'collections'>('dashboard');
@@ -87,8 +88,7 @@ const AdminPage: React.FC = () => {
   // MOBILE MENU STATE
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  const navigate = useNavigate();
-  const location = useLocation(); // To read URL params for secret unlock
+    const navigate = useNavigate();
 
   // CATEGORY MANAGER STATE
   const [localCategories, setLocalCategories] = useState<NavItem[]>([]);
@@ -104,41 +104,41 @@ const AdminPage: React.FC = () => {
   const [targetIndex, setTargetIndex] = useState<{cat: number, sec?: number, item?: number} | null>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
-  const ADMIN_PIN = '34982';
-  const MAX_ATTEMPTS = 3;
-
-  // Scroll to top on tab change
+    // Scroll to top on tab change
   useEffect(() => {
     window.scrollTo(0, 0);
     setIsMobileMenuOpen(false); // Close mobile menu on nav
   }, [activeTab]);
 
-  // --- SECURITY: INITIALIZE & SECRET UNLOCK ---
-  useEffect(() => {
-    // 1. Check for Secret Unlock Command in URL (?cmd=reset_security)
-    const params = new URLSearchParams(location.search);
-    if (params.get('cmd') === 'reset_security') {
-        localStorage.removeItem('admin_failed_attempts');
-        localStorage.removeItem('admin_locked_status');
-        setAttempts(0);
-        setIsLocked(false);
-        alert("🛡️ Security Protocol Reset: Lock removed.");
-        // Clear URL to hide the secret
-        navigate('/admin', { replace: true });
-        return;
-    }
+    // --- ADMIN AUTH: CHECK ACCESS ---
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                setIsAdmin(false);
+                setAuthLoading(false);
+                return;
+            }
 
-    // 2. Load Persisted Security State
-    const storedAttempts = localStorage.getItem('admin_failed_attempts');
-    const storedLock = localStorage.getItem('admin_locked_status');
+            try {
+                const adminRef = doc(db, 'users', user.uid);
+                const adminSnap = await getDoc(adminRef);
+                const isAdminFlag = adminSnap.exists() && adminSnap.data()?.isAdmin === true;
+                setIsAdmin(isAdminFlag);
+                setAuthLoading(false);
+                if (!isAdminFlag) {
+                    setAuthError('Access denied. This account is not an admin.');
+                    await signOut(auth);
+                }
+            } catch (error) {
+                console.error('Admin auth check failed:', error);
+                setIsAdmin(false);
+                setAuthLoading(false);
+                setAuthError('Unable to verify admin access. Please try again.');
+            }
+        });
 
-    if (storedLock === 'true') {
-        setIsLocked(true);
-        setAttempts(MAX_ATTEMPTS);
-    } else if (storedAttempts) {
-        setAttempts(Number(storedAttempts));
-    }
-  }, [location.search, navigate]);
+        return () => unsubscribe();
+    }, []);
 
   useEffect(() => {
     setLocalCategories(categories);
@@ -162,36 +162,21 @@ const AdminPage: React.FC = () => {
     }
   }, [products, categories]);
 
-  // --- SECURITY: LOGIN HANDLER ---
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (isLocked) return;
+    // --- ADMIN LOGIN HANDLER ---
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setAuthError('');
+        setAuthLoading(true);
 
-    if (password === ADMIN_PIN) {
-      // SUCCESS
-      setIsAuthenticated(true);
-      // Reset security stats on success
-      setAttempts(0);
-      localStorage.removeItem('admin_failed_attempts');
-      localStorage.removeItem('admin_locked_status');
-      setPassword('');
-    } else {
-      // FAILED
-      const newAttempts = attempts + 1;
-      setAttempts(newAttempts);
-      localStorage.setItem('admin_failed_attempts', String(newAttempts));
-      
-      // Trigger Shake Animation
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-
-      if (newAttempts >= MAX_ATTEMPTS) {
-        setIsLocked(true);
-        localStorage.setItem('admin_locked_status', 'true');
-      }
-    }
-  };
+        try {
+            await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+        } catch (error: any) {
+            console.error('Admin login failed:', error);
+            const message = error?.message || 'Login failed. Please check your email and password.';
+            setAuthError(message);
+            setAuthLoading(false);
+        }
+    };
 
   // --- DEFAULT SPECIFICATIONS TEMPLATE ---
   const DEFAULT_SPECS: ProductSpecification[] = [
@@ -780,7 +765,17 @@ const AdminPage: React.FC = () => {
   const availableManagerProducts = products.filter(p => activeTab === 'trending' ? !p.isTrending : !p.isFeaturedCollection);
 
   // --- LOGIN SCREEN WITH SECURITY ---
-  if (!isAuthenticated) {
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="flex items-center gap-3 text-gray-600">
+                    <Loader className="animate-spin" size={20} /> Checking admin access...
+                </div>
+            </div>
+        );
+    }
+
+    if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 relative overflow-hidden">
         {/* Background Pattern */}
@@ -789,62 +784,54 @@ const AdminPage: React.FC = () => {
             <div className="absolute bottom-0 right-0 w-64 h-64 bg-brand-black rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
         </div>
 
-        <div className={`bg-white p-10 rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 transition-all duration-300 ${shake ? 'animate-[shake_0.5s_ease-in-out]' : ''}`}>
+                <div className="bg-white p-10 rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 transition-all duration-300">
           <div className="text-center mb-8">
             <div className="w-16 h-16 mx-auto mb-4 bg-brand-black rounded-full flex items-center justify-center shadow-lg text-gold-500">
-               {isLocked ? <ShieldAlert size={32} /> : <Lock size={32} />}
+                             <Lock size={32} />
             </div>
             <h2 className="text-3xl font-serif font-bold text-gray-900">Admin Portal</h2>
             <p className="text-sm text-gray-500 mt-2 font-medium">Sanghavi Gold</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-                <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Security PIN</label>
-                    {!isLocked && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${attempts > 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
-                            {attempts > 0 ? `${MAX_ATTEMPTS - attempts} Tries Left` : 'Secure Login'}
-                        </span>
-                    )}
-                </div>
-                <input 
-                  type="password" 
-                  autoFocus
-                  disabled={isLocked}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full border-2 p-4 rounded-xl text-center text-3xl tracking-[0.5em] outline-none transition-all duration-300 font-mono 
-                    ${isLocked 
-                        ? 'bg-gray-100 border-red-200 cursor-not-allowed text-gray-400' 
-                        : 'border-gray-200 focus:border-brand-black focus:ring-4 focus:ring-gray-100'
-                    }
-                    ${shake ? 'border-red-500 text-red-500' : ''}
-                  `}
-                  placeholder={isLocked ? "•••••" : "•••••"}
-                  maxLength={5}
-                />
-            </div>
+                        <div>
+                                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Admin Email</label>
+                                <input 
+                                    type="email" 
+                                    autoFocus
+                                    value={adminEmail}
+                                    onChange={(e) => setAdminEmail(e.target.value)}
+                                    className="w-full border-2 p-3 mt-2 rounded-xl outline-none transition-all duration-300 border-gray-200 focus:border-brand-black focus:ring-4 focus:ring-gray-100"
+                                    placeholder="admin@email.com"
+                                    required
+                                />
+                        </div>
+
+                        <div>
+                                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Password</label>
+                                <input 
+                                    type="password" 
+                                    value={adminPassword}
+                                    onChange={(e) => setAdminPassword(e.target.value)}
+                                    className="w-full border-2 p-3 mt-2 rounded-xl outline-none transition-all duration-300 border-gray-200 focus:border-brand-black focus:ring-4 focus:ring-gray-100"
+                                    placeholder="••••••••"
+                                    required
+                                />
+                        </div>
+
+                        {authError && (
+                            <div className="text-xs text-red-600 bg-red-50 border border-red-100 p-3 rounded-lg">
+                                {authError}
+                            </div>
+                        )}
             
-            {isLocked ? (
-              <div className="bg-red-50 border border-red-100 p-4 rounded-xl text-center space-y-2 animate-fade-in-up">
-                 <h4 className="text-red-800 font-bold flex items-center justify-center gap-2"><ShieldAlert size={18}/> Access Locked</h4>
-                 <p className="text-xs text-red-600 leading-relaxed">
-                    Security protocol activated due to multiple failed attempts. IP Address logged.
-                 </p>
-                 <div className="pt-2 border-t border-red-100 mt-2">
-                    <p className="text-xs font-bold text-gray-700">Contact Website Builder</p>
-                    <p className="text-[10px] text-gray-400">(Or use master unlock key)</p>
-                 </div>
-              </div>
-            ) : (
-                <button 
-                type="submit" 
-                className="w-full py-4 rounded-xl font-bold transition shadow-lg bg-brand-black text-white hover:bg-gray-800 hover:shadow-xl active:scale-95 text-sm uppercase tracking-widest"
-                >
-                Authenticate
-                </button>
-            )}
+                        <button 
+                            type="submit" 
+                            disabled={authLoading}
+                            className="w-full py-4 rounded-xl font-bold transition shadow-lg bg-brand-black text-white hover:bg-gray-800 hover:shadow-xl active:scale-95 text-sm uppercase tracking-widest disabled:opacity-60"
+                        >
+                            {authLoading ? 'Signing In...' : 'Authenticate'}
+                        </button>
           </form>
 
           <button onClick={() => navigate('/')} className="w-full text-center text-xs font-bold text-gray-400 mt-8 hover:text-brand-black transition uppercase tracking-wide">
@@ -857,13 +844,6 @@ const AdminPage: React.FC = () => {
              <div className="w-1 h-1 rounded-full bg-gray-400"></div>
           </div>
         </div>
-        <style>{`
-            @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-                20%, 40%, 60%, 80% { transform: translateX(5px); }
-            }
-        `}</style>
       </div>
     );
   }
@@ -951,7 +931,7 @@ const AdminPage: React.FC = () => {
             <button onClick={() => navigate('/')} className="flex items-center justify-center gap-2 text-brand-black px-3 py-2.5 rounded-lg text-sm font-bold bg-white border border-gray-200 hover:bg-gold-50 hover:text-gold-700 w-full transition shadow-sm">
                 <Store size={18} /> Visit Live Store
             </button>
-            <button onClick={() => setIsAuthenticated(false)} className="flex items-center gap-3 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 w-full transition">
+            <button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 w-full transition">
                 <LogOut size={18} /> Logout
             </button>
         </div>
