@@ -11,7 +11,7 @@ import AuthModal from './AuthModal';
 // Custom SG Logo Component using the provided image
 export const SanghaviLogo = ({ className = "w-10 h-10" }: { className?: string }) => (
     <img
-        src="https://drive.google.com/uc?export=view&id=1z17CSqn6eginUAADWnlZBEKmd3owbyWJ"
+        src="/logo.png"
         alt="Sanghavi Gold Logo"
         className={`object-contain ${className}`}
     />
