@@ -1663,9 +1663,9 @@ const AdminPage: React.FC = () => {
                                 {/* Upload Button */}
                                 <label className={`aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${imageUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                     <input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(e, 'product')} className="hidden" disabled={imageUploading} />
-                                        {imageUploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
-                                        <span className="text-xs font-bold text-gray-500 mt-2">Upload</span>
-                                    </label>
+                                    {imageUploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
+                                    <span className="text-xs font-bold text-gray-500 mt-2">Upload</span>
+                                </label>
 
                                 {/* Image Previews */}
                                 {(formData.images || []).map((img, idx) => (
@@ -1694,28 +1694,6 @@ const AdminPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Media (Videos) */}
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Product Videos</h3>
-                                <span className="text-xs text-gray-500">{(formData.videos || []).length} Videos</span>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                <label className={`h-32 rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${videoUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    <input type="file" accept="video/*" multiple onChange={handleVideoUpload} className="hidden" disabled={videoUploading} />
-                                    {videoUploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
-                                    <span className="text-xs font-bold text-gray-500 mt-2">Upload Video</span>
-                                </label>
-
-                                {(formData.videos || []).map((videoUrl, idx) => (
-                                    <div key={idx} className="h-32 rounded-lg border border-gray-200 relative group overflow-hidden bg-gray-50">
-                                        <video src={videoUrl} className="w-full h-full object-cover" controls />
-                                        <button type="button" onClick={() => removeProductVideo(idx)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition shadow-sm"><X size={12} /></button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
 
                         {/* Pricing - UPDATED FOR OPTIONALITY */}
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
