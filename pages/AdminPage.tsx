@@ -172,17 +172,26 @@ const AdminPage: React.FC = () => {
     const perGramToUnit = (value: number, unit: '1g' | '10g' | '100g' | '1kg') => value * unitMultiplier(unit);
     const unitToPerGram = (value: number, unit: '1g' | '10g' | '100g' | '1kg') => value / unitMultiplier(unit);
 
-    const syncRatesInputs = (nextRates: MetalRates) => {
+    const syncRatesInputs = (nextRates: MetalRates, nextGoldUnit: typeof goldUnit, nextSilverUnit: typeof silverUnit) => {
         const safeRates = nextRates || DEFAULT_METAL_RATES;
         const goldValue = safeRates[goldPurity] || 0;
         const silverValue = safeRates.silver || 0;
-        setGoldInput(goldValue ? String(perGramToUnit(goldValue, goldUnit)) : '');
-        setSilverInput(silverValue ? String(perGramToUnit(silverValue, silverUnit)) : '');
+        setGoldInput(goldValue ? String(perGramToUnit(goldValue, nextGoldUnit)) : '');
+        setSilverInput(silverValue ? String(perGramToUnit(silverValue, nextSilverUnit)) : '');
     };
 
     useEffect(() => {
-        syncRatesInputs(rates || DEFAULT_METAL_RATES);
-    }, [rates, goldPurity, goldUnit, silverUnit]);
+        const safeRates = rates || DEFAULT_METAL_RATES;
+        const nextGoldUnit = (safeRates.goldDisplayUnit as typeof goldUnit) || '10g';
+        const nextSilverUnit = (safeRates.silverDisplayUnit as typeof silverUnit) || '1kg';
+        setGoldUnit(nextGoldUnit);
+        setSilverUnit(nextSilverUnit);
+        syncRatesInputs(safeRates, nextGoldUnit, nextSilverUnit);
+    }, [rates, goldPurity]);
+
+    useEffect(() => {
+        syncRatesInputs(rates || DEFAULT_METAL_RATES, goldUnit, silverUnit);
+    }, [goldUnit, silverUnit]);
 
   // Database Connection Mock
   useEffect(() => {
@@ -224,6 +233,7 @@ const AdminPage: React.FC = () => {
     name: '',
     price: 0,
     priceOnRequest: false,
+        cardDisplayMode: 'price',
     category: [], 
     subcategory: '',
     image: '',
@@ -231,6 +241,7 @@ const AdminPage: React.FC = () => {
         videos: [],
     description: '',
     specifications: DEFAULT_SPECS, 
+        weight: '',
     inStock: true,
     isNew: false,
     isTrending: false,
@@ -728,6 +739,8 @@ const AdminPage: React.FC = () => {
               ...baseRates,
               [goldPurity]: goldValue,
               silver: silverValue,
+              goldDisplayUnit: goldUnit,
+              silverDisplayUnit: silverUnit,
               updatedAt: new Date().toISOString()
           };
           await saveRates(nextRates);
@@ -1783,6 +1796,32 @@ const AdminPage: React.FC = () => {
                                         </p>
                                     </div>
                                 </label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-900 mb-1">Card Display</label>
+                                        <select
+                                            value={formData.cardDisplayMode || 'price'}
+                                            onChange={e => setFormData({ ...formData, cardDisplayMode: e.target.value as 'price' | 'weight' | 'none' })}
+                                            className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                                        >
+                                            <option value="price">Show Price</option>
+                                            <option value="weight">Show Weight</option>
+                                            <option value="none">Show Nothing</option>
+                                        </select>
+                                        <p className="text-xs text-gray-500 mt-1">Controls what appears on product cards before opening a product.</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-900 mb-1">Card Weight</label>
+                                        <input
+                                            type="text"
+                                            value={formData.weight || ''}
+                                            onChange={e => setFormData({ ...formData, weight: e.target.value })}
+                                            className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 placeholder-gray-300"
+                                            placeholder="e.g. 12.5g"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Used when "Show Weight" is selected.</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

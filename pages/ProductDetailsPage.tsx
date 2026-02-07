@@ -185,28 +185,19 @@ const ProductDetailsPage: React.FC = () => {
 
             {/* Desktop Action Buttons */}
             <div className="hidden md:grid grid-cols-2 gap-4 py-6">
-               {showPrice ? (
-                   <button 
-                    onClick={handleAddToBag}
-                    disabled={isOutOfStock}
-                    className={`flex flex-col items-center justify-center p-4 bg-brand-black text-white rounded-lg hover:bg-gold-600 transition shadow-lg ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-400' : ''}`}
-                    >
-                    <span className="flex items-center gap-2 font-bold uppercase text-lg"><ShoppingBag size={20} /> Add to Bag</span>
-                    </button>
-               ) : (
-                   <button 
-                    onClick={handleInquire}
-                    className="flex flex-col items-center justify-center p-4 bg-brand-black text-white rounded-lg hover:bg-gold-600 transition shadow-lg"
-                    >
-                    <span className="flex items-center gap-2 font-bold uppercase text-lg"><MessageCircle size={20} /> {isPriceOnRequest ? 'Contact for Price' : 'Inquire'}</span>
-                    </button>
-               )}
+               <button 
+                onClick={handleAddToBag}
+                disabled={isOutOfStock}
+                className={`flex flex-col items-center justify-center p-4 bg-brand-black text-white rounded-lg hover:bg-gold-600 transition shadow-lg ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-400' : ''}`}
+                >
+                <span className="flex items-center gap-2 font-bold uppercase text-lg"><ShoppingBag size={20} /> {isOutOfStock ? 'Sold Out' : 'Add to Bag'}</span>
+                </button>
                
                <button 
                  onClick={handleInquire}
                  className="flex flex-col items-center justify-center p-3 border-2 border-brand-black text-brand-black rounded-lg hover:bg-gray-50 transition"
                >
-                 <span className="flex items-center gap-2 font-bold uppercase text-sm"><MessageCircle size={18} /> Chat on WhatsApp</span>
+                 <span className="flex items-center gap-2 font-bold uppercase text-sm"><MessageCircle size={18} /> Inquire</span>
                  <span className="text-[10px] opacity-70 mt-1">Get instant response</span>
                </button>
             </div>
@@ -358,22 +349,13 @@ const ProductDetailsPage: React.FC = () => {
       
       {/* Mobile Sticky Bottom Action Bar */}
       <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 flex gap-3">
-          {showPrice ? (
-              <button 
-                onClick={handleAddToBag}
-                disabled={isOutOfStock}
-                className={`flex-1 py-3 bg-brand-black text-white font-bold uppercase rounded shadow-lg flex items-center justify-center gap-2 text-sm ${isOutOfStock ? 'opacity-50 bg-gray-500' : ''}`}
-                >
-                <ShoppingBag size={18} /> {isOutOfStock ? 'Sold Out' : 'Add to Bag'}
-                </button>
-          ) : (
-              <button 
-                onClick={handleInquire}
-                className={`flex-1 py-3 bg-brand-black text-white font-bold uppercase rounded shadow-lg flex items-center justify-center gap-2 text-sm`}
-                >
-                <MessageCircle size={18} /> {isPriceOnRequest ? 'Contact for Price' : 'Inquire'}
-                </button>
-          )}
+          <button 
+            onClick={handleAddToBag}
+            disabled={isOutOfStock}
+            className={`flex-1 py-3 bg-brand-black text-white font-bold uppercase rounded shadow-lg flex items-center justify-center gap-2 text-sm ${isOutOfStock ? 'opacity-50 bg-gray-500' : ''}`}
+            >
+            <ShoppingBag size={18} /> {isOutOfStock ? 'Sold Out' : 'Add to Bag'}
+            </button>
           <button 
              onClick={handleInquire}
              className="flex-1 py-3 border border-brand-black text-brand-black font-bold uppercase rounded flex items-center justify-center gap-2 text-sm"

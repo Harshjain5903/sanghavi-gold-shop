@@ -6,6 +6,8 @@ export const DEFAULT_METAL_RATES = {
   gold24k: 0,
   gold18k: 0,
   silver: 0,
+  goldDisplayUnit: '10g',
+  silverDisplayUnit: '1kg',
   updatedAt: ''
 };
 
@@ -275,7 +277,7 @@ export const TRUST_FEATURES = [
   {
     icon: ShieldCheck,
     title: "100% Certified",
-    desc: "22kt 916 HUID Hallmarked"
+    desc: "HUID Hallmarked"
   },
   {
     icon: Zap,

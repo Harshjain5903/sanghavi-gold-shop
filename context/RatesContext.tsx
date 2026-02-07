@@ -28,6 +28,8 @@ export const RatesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             gold24k: Number(data?.gold24k || 0),
             gold18k: Number(data?.gold18k || 0),
             silver: Number(data?.silver || 0),
+            goldDisplayUnit: data?.goldDisplayUnit || '10g',
+            silverDisplayUnit: data?.silverDisplayUnit || '1kg',
             updatedAt: data?.updatedAt || ''
           });
         } else {

@@ -37,12 +37,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   const isOutOfStock = product.inStock === false;
   
-  // Logic: Show price only if it exists (>0) AND "Price on Request" is NOT checked.
-  // Logic: Show "Price on Request" only if "Price on Request" IS checked.
-  // Logic: Else show nothing.
-    const isPriceOnRequest = product.priceOnRequest === true;
-    const hasPrice = product.price && product.price > 0;
-    const showPrice = hasPrice && !isPriceOnRequest;
+  const displayMode = product.cardDisplayMode || 'price';
+  const isPriceOnRequest = product.priceOnRequest === true;
+  const hasPrice = product.price && product.price > 0;
+  const showPrice = displayMode === 'price' && hasPrice && !isPriceOnRequest;
+  const showPriceOnRequest = displayMode === 'price' && isPriceOnRequest;
+  const showWeight = displayMode === 'weight' && product.weight && product.weight.trim().length > 0;
 
   return (
     <div 
@@ -88,8 +88,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                         <span className="text-[10px] md:text-xs text-red-600 font-bold block mt-0.5">Flat {discount}% Off</span>
                     )}
                  </>
-             ) : isPriceOnRequest ? (
+             ) : showPriceOnRequest ? (
                  <span className="text-xs md:text-sm font-bold text-gold-600 uppercase tracking-wide">Price on Request</span>
+             ) : showWeight ? (
+               <span className="text-xs md:text-sm font-bold text-gray-700">Weight: {product.weight}</span>
              ) : null}
         </div>
 

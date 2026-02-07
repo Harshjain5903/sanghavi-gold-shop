@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Menu, X, Search, User, ChevronRight, ChevronLeft, ArrowUpRight, ShoppingBag } from 'lucide-react';
+import { Menu, X, Search, User, MapPin, Phone, ChevronRight, ChevronLeft, ArrowUpRight, ShoppingBag } from 'lucide-react';
 import { SHOP_INFO } from '../constants';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
@@ -25,7 +25,7 @@ const Navbar: React.FC = () => {
   const { cartCount } = useCart();
   const { isAuthenticated } = useAuth();
     const { rates } = useRates();
-    const [extraGoldPurity, setExtraGoldPurity] = useState<'gold24k' | 'gold18k'>('gold24k');
+    const [goldPurity, setGoldPurity] = useState<'gold24k' | 'gold22k' | 'gold18k'>('gold24k');
   
   // Mobile Menu State
   const [mobileSubMenu, setMobileSubMenu] = useState<string | null>(null);
@@ -167,11 +167,12 @@ const Navbar: React.FC = () => {
   };
 
     const hasRates = rates.gold22k > 0 || rates.gold24k > 0 || rates.gold18k > 0 || rates.silver > 0;
-    const formatPer10g = (value: number) => (value > 0 ? `INR ${(value * 10).toLocaleString('en-IN')}/10g` : '--');
-    const formatPerKg = (value: number) => (value > 0 ? `INR ${(value * 1000).toLocaleString('en-IN')}/kg` : '--');
-    const updatedText = rates.updatedAt
-        ? new Date(rates.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-        : '';
+    const formatByUnit = (value: number, unit: '1g' | '10g' | '100g' | '1kg') => {
+        if (!value || value <= 0) return '--';
+        const multiplier = unit === '10g' ? 10 : unit === '100g' ? 100 : unit === '1kg' ? 1000 : 1;
+        const label = unit === '1kg' ? 'kg' : unit;
+        return `INR ${(value * multiplier).toLocaleString('en-IN')}/${label}`;
+    };
 
   return (
     <>
@@ -187,25 +188,26 @@ const Navbar: React.FC = () => {
                                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                                     LIVE RATES
                                 </span>
-                                <span>Gold 22kt: {formatPer10g(rates.gold22k)}</span>
                                 <div className="inline-flex items-center gap-1">
+                                    <span>Gold</span>
                                     <select
-                                        value={extraGoldPurity}
-                                        onChange={(e) => setExtraGoldPurity(e.target.value as 'gold24k' | 'gold18k')}
+                                        value={goldPurity}
+                                        onChange={(e) => setGoldPurity(e.target.value as 'gold24k' | 'gold22k' | 'gold18k')}
                                         className="bg-white/10 border border-white/20 rounded px-1 py-0.5 text-[10px] sm:text-xs text-white"
                                         aria-label="Select gold purity"
                                     >
                                         <option value="gold24k">24kt</option>
+                                        <option value="gold22k">22kt</option>
                                         <option value="gold18k">18kt</option>
                                     </select>
+                                    <span>:</span>
                                     <span>
-                                        {extraGoldPurity === 'gold24k'
-                                            ? formatPer10g(rates.gold24k)
-                                            : formatPer10g(rates.gold18k)}
+                                        {goldPurity === 'gold24k' && formatByUnit(rates.gold24k, rates.goldDisplayUnit || '10g')}
+                                        {goldPurity === 'gold22k' && formatByUnit(rates.gold22k, rates.goldDisplayUnit || '10g')}
+                                        {goldPurity === 'gold18k' && formatByUnit(rates.gold18k, rates.goldDisplayUnit || '10g')}
                                     </span>
                                 </div>
-                                <span>Silver: {formatPerKg(rates.silver)}</span>
-                                {updatedText && <span className="text-gray-300">({updatedText})</span>}
+                                <span>Silver: {formatByUnit(rates.silver, rates.silverDisplayUnit || '1kg')}</span>
                             </div>
                         )}
             </div>

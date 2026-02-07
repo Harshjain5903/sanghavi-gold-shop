@@ -24,6 +24,7 @@ export interface Product {
   price: number;
   originalPrice?: number; // For discount display
   priceOnRequest?: boolean; // New: If true, hide price and show Inquiry button
+  cardDisplayMode?: 'price' | 'weight' | 'none';
   category: string[]; // Changed from enum array to string array to support dynamic categories
   subcategory?: string; // e.g., "Studs", "Jhumkas", "Chains"
   image: string; // Keep for backward compatibility (serves as primary image)
@@ -72,5 +73,7 @@ export interface MetalRates {
   gold24k: number;
   gold18k: number;
   silver: number;
+  goldDisplayUnit?: '1g' | '10g' | '100g' | '1kg';
+  silverDisplayUnit?: '1g' | '10g' | '100g' | '1kg';
   updatedAt?: string;
 }
