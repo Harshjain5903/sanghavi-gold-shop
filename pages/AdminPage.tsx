@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { storage } from '../lib/firebase';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
 
@@ -80,7 +80,7 @@ const AdminPage: React.FC = () => {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-    const [imageUploading, setImageUploading] = useState(false);
+    const [uploading, setUploading] = useState(false);
   const [managerSearch, setManagerSearch] = useState('');
   const [dbStatus, setDbStatus] = useState<'connecting' | 'connected'>('connecting');
   
@@ -366,88 +366,34 @@ const AdminPage: React.FC = () => {
     }
   };
 
-    const uploadWithTimeout = (task: ReturnType<typeof uploadBytesResumable>, timeoutMs: number) => {
-        return new Promise<ReturnType<typeof uploadBytesResumable>['snapshot']>((resolve, reject) => {
-            const timer = setTimeout(() => {
-                task.cancel();
-                reject(new Error('Upload timed out. Please try again on a stronger network.'));
-            }, timeoutMs);
-
-            task.on('state_changed', undefined, (error) => {
-                clearTimeout(timer);
-                reject(error);
-            }, () => {
-                clearTimeout(timer);
-                resolve(task.snapshot);
-            });
-        });
-    };
-
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'product' | 'category', catIndex?: number) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        setImageUploading(true);
+        setUploading(true);
         try {
-            const maxBytes = 50 * 1024 * 1024; // 50MB per image
-            const maxImages = 30;
-            const timeoutMs = 120000;
-            const skipped: string[] = [];
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-
             if (target === 'product') {
                 const newImageUrls: string[] = [];
-                const existingImages = formData.images || (formData.image ? [formData.image] : []);
-                const remainingSlots = Math.max(0, maxImages - existingImages.length);
-
-                const uploadQueue = (Array.from(files) as File[]).slice(0, remainingSlots);
-
-                for (const file of uploadQueue) {
-                    if (file.size > maxBytes) {
-                        skipped.push(`${file.name} (over 50MB)`);
-                        continue;
-                    }
-                    if (file.type && !allowedTypes.includes(file.type)) {
-                        skipped.push(`${file.name} (unsupported type)`);
-                        continue;
-                    }
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    if (file.size > 5 * 1024 * 1024) continue; 
                     const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-                    const task = uploadBytesResumable(storageRef, file, { contentType: file.type || 'image/jpeg' });
-                    try {
-                        const snapshot = await uploadWithTimeout(task, timeoutMs);
-                        const downloadURL = await getDownloadURL(snapshot.ref);
-                        newImageUrls.push(downloadURL);
-                    } catch (error: any) {
-                        const reason = error?.code === 'storage/unauthorized'
-                            ? 'permission denied'
-                            : (error?.message || 'upload failed');
-                        skipped.push(`${file.name} (${reason})`);
-                    }
+                    const snapshot = await uploadBytes(storageRef, file);
+                    const downloadURL = await getDownloadURL(snapshot.ref);
+                    newImageUrls.push(downloadURL);
                 }
-
-                if (newImageUrls.length === 0) {
-                    const reason = skipped.length > 0 ? `Skipped: ${skipped.join(', ')}` : 'No valid files selected.';
-                    alert(`⚠️ Upload Failed. ${reason}`);
-                    return;
-                }
-
                 setFormData(prev => {
                     const currentImages = prev.images || (prev.image ? [prev.image] : []);
                     const updatedImages = [...currentImages, ...newImageUrls];
-                    return {
-                        ...prev,
+                    return { 
+                        ...prev, 
                         images: updatedImages,
                         image: updatedImages.length > 0 ? updatedImages[0] : ''
                     };
                 });
             } else if (target === 'category' && catIndex !== undefined) {
                 const file = files[0];
-                if (file.size > maxBytes) {
-                    alert('⚠️ Upload Failed. Image is larger than 50MB.');
-                    return;
-                }
                 const storageRef = ref(storage, `categories/${Date.now()}_${file.name}`);
-                const task = uploadBytesResumable(storageRef, file, { contentType: file.type || 'image/jpeg' });
-                const snapshot = await uploadWithTimeout(task, timeoutMs);
+                const snapshot = await uploadBytes(storageRef, file);
                 const downloadURL = await getDownloadURL(snapshot.ref);
                 const updatedCats = [...localCategories];
                 updatedCats[catIndex] = { ...updatedCats[catIndex], image: downloadURL };
@@ -456,12 +402,9 @@ const AdminPage: React.FC = () => {
             }
         } catch (error: any) {
             console.error("Error uploading image:", error);
-            const message = error?.code === 'storage/unauthorized'
-                ? 'Permission denied. Please check Firebase Storage rules.'
-                : (error?.message || 'Unknown error');
-            alert(`⚠️ Upload Failed. ${message}`);
+            alert("⚠️ Upload Failed. Please try again.");
         } finally {
-            setImageUploading(false);
+            setUploading(false);
             if (e.target) {
                 e.target.value = '';
             }
@@ -1604,9 +1547,9 @@ const AdminPage: React.FC = () => {
                             
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                                 {/* Upload Button */}
-                                <label className={`aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${imageUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    <input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(e, 'product')} className="hidden" disabled={imageUploading} />
-                                    {imageUploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
+                                <label className={`aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    <input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(e, 'product')} className="hidden" disabled={uploading} />
+                                    {uploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
                                     <span className="text-xs font-bold text-gray-500 mt-2">Upload</span>
                                 </label>
 
@@ -1779,7 +1722,7 @@ const AdminPage: React.FC = () => {
                             </div>
                         </div>
 
-                        <button type="submit" disabled={imageUploading} className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gold-600 transition shadow-lg flex items-center justify-center gap-2">
+                        <button type="submit" disabled={uploading} className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gold-600 transition shadow-lg flex items-center justify-center gap-2">
                             <Save size={20} /> {activeTab === 'add' ? 'Publish Product' : 'Update Product'}
                         </button>
                     </div>
