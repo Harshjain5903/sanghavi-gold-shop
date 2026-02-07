@@ -5,6 +5,8 @@ import { CartProvider } from './context/CartContext';
 import { ProductProvider } from './context/ProductContext';
 import { AuthProvider } from './context/AuthContext';
 import { CategoryProvider } from './context/CategoryContext';
+import { SortOptionsProvider } from './context/SortOptionsContext';
+import { FilterOptionsProvider } from './context/FilterOptionsContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -16,11 +18,15 @@ root.render(
   <React.StrictMode>
     <AuthProvider>
       <CategoryProvider>
-        <ProductProvider>
-            <CartProvider>
-              <App />
-            </CartProvider>
-        </ProductProvider>
+        <SortOptionsProvider>
+          <FilterOptionsProvider>
+            <ProductProvider>
+                <CartProvider>
+                  <App />
+                </CartProvider>
+            </ProductProvider>
+          </FilterOptionsProvider>
+        </SortOptionsProvider>
       </CategoryProvider>
     </AuthProvider>
   </React.StrictMode>

@@ -91,8 +91,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
              ) : isPriceOnRequest ? (
                  <span className="text-xs md:text-sm font-bold text-gold-600 uppercase tracking-wide">Price on Request</span>
              ) : (
-                 // Empty space to maintain card height alignment if no price is shown
-                 null
+                 <span className="text-xs md:text-sm font-medium text-gray-400">Price not listed</span>
              )}
         </div>
 

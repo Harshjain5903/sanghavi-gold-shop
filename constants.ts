@@ -242,6 +242,27 @@ export const NAV_CONFIG: NavItem[] = [
   }
 ];
 
+export const DEFAULT_SORT_OPTIONS: string[] = [
+  'Recommended',
+  'Price: Low to High',
+  'Price: High to Low',
+  'Newest',
+  'Trending',
+  'Name: A to Z',
+  'Name: Z to A'
+];
+
+export const DEFAULT_FILTER_SECTIONS = [
+  {
+    title: 'Price',
+    items: ['Under ₹20,000', '₹20,000 - ₹50,000', 'Above ₹50,000']
+  },
+  {
+    title: 'Material',
+    items: ['Gold', 'Diamond', 'Silver']
+  }
+];
+
 export const TRUST_FEATURES = [
   {
     icon: ShieldCheck,

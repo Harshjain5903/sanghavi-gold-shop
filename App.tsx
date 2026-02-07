@@ -17,6 +17,8 @@ import { Category, Product } from './types';
 import { ArrowRight, Filter, ChevronDown, X, ArrowUpDown, Check, Search, Sparkles, Frown } from 'lucide-react';
 import { useProducts } from './context/ProductContext';
 import { useCategories } from './context/CategoryContext';
+import { useSortOptions } from './context/SortOptionsContext';
+import { useFilterOptions } from './context/FilterOptionsContext';
 
 // --- ScrollToTop Helper Component ---
 const ScrollToTop = () => {
@@ -215,8 +217,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({ title, options, selected,
       >
         <span className="font-bold text-gray-800 text-sm uppercase tracking-wide">{title}</span>
         <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-      
+    </button>
       {isOpen && (
         <div className="space-y-2 mt-2">
           {options.map(option => (
@@ -242,6 +243,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({ title, options, selected,
 const CollectionsPage = () => {
     const { products } = useProducts();
     const { categories } = useCategories();
+    const { sortOptions } = useSortOptions();
+    const { filterSections } = useFilterOptions();
     const location = useLocation();
     const searchParams = new URLSearchParams(location.search);
     const categoryParam = searchParams.get('category');
@@ -250,12 +253,19 @@ const CollectionsPage = () => {
 
     const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+    const [isMobileSortOpen, setIsMobileSortOpen] = useState(false);
     
     // Search State
     const [searchStatus, setSearchStatus] = useState<'exact' | 'similar' | 'fallback'>('exact');
     
     // Dynamic Filter State
     const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
+    const [selectedSort, setSelectedSort] = useState('');
+
+    useEffect(() => {
+        if (sortOptions.length === 0) return;
+        setSelectedSort(prev => (prev && sortOptions.includes(prev)) ? prev : sortOptions[0]);
+    }, [sortOptions]);
 
     // Reset filters when main category changes
     useEffect(() => {
@@ -264,6 +274,109 @@ const CollectionsPage = () => {
 
     // Get current category config to build sidebar
     const currentCategoryConfig = categories.find(c => c.category === categoryParam);
+    const activeFilterSections = currentCategoryConfig ? currentCategoryConfig.sections : filterSections;
+
+    const normalizeText = (value: string) => value
+        .toLowerCase()
+        .replace(/[^a-z0-9\s.\-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const toNumberWithUnit = (raw: string, unit?: string) => {
+        const cleaned = raw.replace(/,/g, '').trim();
+        const base = Number.parseFloat(cleaned);
+        if (Number.isNaN(base)) return null;
+        if (!unit) return base;
+        if (unit.startsWith('k')) return base * 1000;
+        if (unit.startsWith('l')) return base * 100000;
+        return base;
+    };
+
+    const extractPriceValues = (label: string) => {
+        const matches = Array.from(label.toLowerCase().matchAll(/(\d+(?:[.,]\d+)?)(?:\s*(k|l|lac|lakh))?/g));
+        const values = matches.map(match => {
+            const unit = match[2] ? match[2].replace('lakh', 'l').replace('lac', 'l') : undefined;
+            return toNumberWithUnit(match[1], unit || undefined);
+        }).filter((val): val is number => typeof val === 'number' && !Number.isNaN(val));
+        return values;
+    };
+
+    const parsePriceRange = (label: string) => {
+        const lower = label.toLowerCase();
+        const values = extractPriceValues(label);
+        if (values.length === 0) return null;
+
+        if (lower.includes('under') || lower.includes('below')) {
+            return { max: values[0] };
+        }
+        if (lower.includes('above') || lower.includes('over') || lower.includes('& above')) {
+            return { min: values[0] };
+        }
+        if (lower.includes(' to ') || lower.includes('-')) {
+            return { min: values[0], max: values[1] ?? values[0] };
+        }
+
+        return { min: values[0] };
+    };
+
+    const matchesPriceOption = (product: Product, label: string) => {
+        const price = product.price || 0;
+        if (price <= 0) return false;
+        const range = parsePriceRange(label);
+        if (!range) return false;
+        if (range.min !== undefined && price < range.min) return false;
+        if (range.max !== undefined && price > range.max) return false;
+        return true;
+    };
+
+    const matchesTextOption = (product: Product, option: string) => {
+        const optNorm = normalizeText(option);
+        if (!optNorm) return false;
+
+        const optionCore = optNorm.startsWith('all ') ? optNorm.replace(/^all\s+/, '') : optNorm;
+        const pName = normalizeText(product.name || '');
+        const pSub = normalizeText(product.subcategory || '');
+        const pDesc = normalizeText(product.description || '');
+        const pCats = (product.category || []).map(c => normalizeText(c));
+
+        if (pSub && (pSub === optionCore || pSub.includes(optionCore) || optionCore.includes(pSub))) return true;
+        if (pCats.some(cat => cat === optionCore || cat.includes(optionCore) || optionCore.includes(cat))) return true;
+        if (pName.includes(optionCore)) return true;
+        if (pDesc.includes(optionCore)) return true;
+        return false;
+    };
+
+    const getSortablePrice = (product: Product, emptyValue: number) => {
+        const price = product.price || 0;
+        return price > 0 ? price : emptyValue;
+    };
+
+    const applySort = (items: Product[], sortLabel: string) => {
+        if (!sortLabel) return items;
+        const key = normalizeText(sortLabel);
+        const list = [...items];
+
+        if (key.includes('price') && key.includes('low')) {
+            return list.sort((a, b) => getSortablePrice(a, Number.MAX_SAFE_INTEGER) - getSortablePrice(b, Number.MAX_SAFE_INTEGER));
+        }
+        if (key.includes('price') && key.includes('high')) {
+            return list.sort((a, b) => getSortablePrice(b, -1) - getSortablePrice(a, -1));
+        }
+        if (key.includes('new')) {
+            return list.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+        }
+        if (key.includes('trend')) {
+            return list.sort((a, b) => (b.isTrending ? 1 : 0) - (a.isTrending ? 1 : 0));
+        }
+        if (key.includes('name') && key.includes('z')) {
+            return list.sort((a, b) => b.name.localeCompare(a.name));
+        }
+        if (key.includes('name') && key.includes('a')) {
+            return list.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        return items;
+    };
 
     // --- INTELLIGENT SEARCH & FILTER ENGINE ---
     useEffect(() => {
@@ -379,31 +492,18 @@ const CollectionsPage = () => {
         Object.entries(selectedFilters).forEach(([sectionTitle, selectedOptions]) => {
             const options = selectedOptions as string[];
             if (options.length > 0) {
-                 result = result.filter(p => {
-                     return options.some(opt => 
-                        (() => {
-                            const optNorm = opt.toLowerCase().trim();
-                            const pSub = (p.subcategory || '').toLowerCase().trim();
-                            const catMatch = p.category.some(c => {
-                                const productCat = c.toLowerCase().trim();
-                                return productCat.includes(optNorm) || optNorm.includes(productCat);
-                            });
-
-                            return (
-                                pSub === optNorm ||
-                                (pSub && pSub.includes(optNorm)) ||
-                                (optNorm && optNorm.includes(pSub)) ||
-                                catMatch ||
-                                (sectionTitle.toLowerCase().includes("price") ? true : false)
-                            );
-                        })()
-                     );
-                 });
+                 const isPriceSection = /price/i.test(sectionTitle);
+                 result = result.filter(p => options.some(option => {
+                     return isPriceSection
+                         ? matchesPriceOption(p, option)
+                         : matchesTextOption(p, option);
+                 }));
             }
         });
 
-        setFilteredProducts(result);
-    }, [categoryParam, subcategoryParam, searchQuery, products, selectedFilters, categories]);
+        const sorted = applySort(result, selectedSort);
+        setFilteredProducts(sorted);
+    }, [categoryParam, subcategoryParam, searchQuery, products, selectedFilters, categories, selectedSort]);
 
     const toggleDynamicFilter = (sectionTitle: string, option: string) => {
         setSelectedFilters(prev => {
@@ -464,9 +564,25 @@ const CollectionsPage = () => {
                                 </h1>
                              )}
                         </div>
-                        <span className="text-sm text-gray-500 font-medium bg-white px-3 py-1 rounded-full border border-gray-100 shadow-sm">
-                            {filteredProducts.length} Designs
-                        </span>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <span className="text-sm text-gray-500 font-medium bg-white px-3 py-1 rounded-full border border-gray-100 shadow-sm">
+                                {filteredProducts.length} Designs
+                            </span>
+                            {sortOptions.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sort</span>
+                                    <select
+                                        value={selectedSort}
+                                        onChange={(e) => setSelectedSort(e.target.value)}
+                                        className="text-sm border border-gray-200 rounded-full px-3 py-1 bg-white text-gray-700 focus:outline-none focus:border-gold-500"
+                                    >
+                                        {sortOptions.map(option => (
+                                            <option key={option} value={option}>{option}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -480,8 +596,8 @@ const CollectionsPage = () => {
                             <h3 className="font-bold text-gray-400 text-xs uppercase tracking-widest mb-4">Filter By</h3>
                             
                             {/* Dynamic Filters based on Navigation Config */}
-                            {currentCategoryConfig ? (
-                                currentCategoryConfig.sections.map((section, idx) => (
+                            {activeFilterSections.length > 0 ? (
+                                activeFilterSections.map((section, idx) => (
                                     <FilterSection 
                                         key={idx}
                                         title={section.title}
@@ -492,22 +608,7 @@ const CollectionsPage = () => {
                                     />
                                 ))
                             ) : (
-                                <>
-                                  <FilterSection 
-                                    title="Price" 
-                                    options={['Under ₹20,000', '₹20,000 - ₹50,000', 'Above ₹50,000']}
-                                    selected={selectedFilters['Price'] || []}
-                                    onChange={(val) => toggleDynamicFilter('Price', val)}
-                                    isOpenDefault={true}
-                                  />
-                                   <FilterSection 
-                                    title="Material" 
-                                    options={['Gold', 'Diamond', 'Silver']}
-                                    selected={selectedFilters['Material'] || []}
-                                    onChange={(val) => toggleDynamicFilter('Material', val)}
-                                    isOpenDefault={true}
-                                  />
-                                </>
+                                <p className="text-gray-500 text-sm">Select a category to see specific filters.</p>
                             )}
                         </div>
                     </div>
@@ -545,7 +646,10 @@ const CollectionsPage = () => {
                     >
                         <Filter size={16} /> Filter
                     </button>
-                    <button className="py-4 flex items-center justify-center gap-2 font-bold text-gray-800 text-sm uppercase tracking-wide active:bg-gray-50">
+                    <button 
+                        onClick={() => setIsMobileSortOpen(true)}
+                        className="py-4 flex items-center justify-center gap-2 font-bold text-gray-800 text-sm uppercase tracking-wide active:bg-gray-50"
+                    >
                         <ArrowUpDown size={16} /> Sort
                     </button>
                 </div>
@@ -563,8 +667,8 @@ const CollectionsPage = () => {
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4">
-                            {currentCategoryConfig ? (
-                                currentCategoryConfig.sections.map((section, idx) => (
+                            {activeFilterSections.length > 0 ? (
+                                activeFilterSections.map((section, idx) => (
                                     <FilterSection 
                                         key={idx}
                                         title={section.title}
@@ -590,6 +694,47 @@ const CollectionsPage = () => {
                                 className="flex-1 py-3 bg-brand-black text-white rounded font-bold"
                             >
                                 Apply ({filteredProducts.length})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 6. MOBILE SORT DRAWER */}
+            {isMobileSortOpen && (
+                <div className="fixed inset-0 z-50 lg:hidden">
+                    <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setIsMobileSortOpen(false)} />
+                    <div className="absolute bottom-0 left-0 w-full bg-white rounded-t-xl h-[60vh] flex flex-col animate-fade-in-up">
+                        <div className="flex justify-between items-center p-4 border-b border-gray-100">
+                            <h3 className="font-bold text-lg">Sort By</h3>
+                            <button onClick={() => setIsMobileSortOpen(false)} className="p-2 bg-gray-100 rounded-full">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {sortOptions.length === 0 ? (
+                                <p className="text-gray-500 text-sm">No sort options available.</p>
+                            ) : (
+                                sortOptions.map(option => (
+                                    <label key={option} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
+                                        <input
+                                            type="radio"
+                                            name="mobile-sort"
+                                            checked={selectedSort === option}
+                                            onChange={() => setSelectedSort(option)}
+                                            className="w-4 h-4 accent-brand-black"
+                                        />
+                                        <span className="text-sm text-gray-700">{option}</span>
+                                    </label>
+                                ))
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-gray-100">
+                            <button
+                                onClick={() => setIsMobileSortOpen(false)}
+                                className="w-full py-3 bg-brand-black text-white rounded font-bold"
+                            >
+                                Apply Sort
                             </button>
                         </div>
                     </div>

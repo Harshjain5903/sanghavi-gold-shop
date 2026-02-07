@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useProducts } from '../context/ProductContext';
 import { useCategories } from '../context/CategoryContext';
+import { useSortOptions } from '../context/SortOptionsContext';
+import { useFilterOptions } from '../context/FilterOptionsContext';
 import { Product, NavItem, ProductSpecification } from '../types';
+import { MegaMenuSection } from '../types';
 import { 
   Plus, Edit2, Trash2, Save, Loader, 
   LayoutDashboard, Package, LogOut, Search, 
   ChevronRight, ChevronDown, ChevronUp, Image as ImageIcon,
   AlertCircle, Layers, List, CheckCircle, Store, FolderPlus,
-  Settings, X, Tag, TrendingUp, Sparkles, MinusCircle, UploadCloud,
+    Settings, X, Tag, TrendingUp, Sparkles, MinusCircle, UploadCloud, Filter,
   Megaphone, RefreshCw, GripVertical, Crown, ShieldAlert, Lock, Menu,
   EyeOff, Type
 } from 'lucide-react';
@@ -62,6 +65,8 @@ const ActionCard = ({ title, icon: Icon, onClick, color }: any) => (
 const AdminPage: React.FC = () => {
   const { products, addProduct, updateProduct, deleteProduct } = useProducts();
   const { categories, saveCategories } = useCategories();
+    const { sortOptions, saveSortOptions, resetToDefault: resetSortOptions } = useSortOptions();
+    const { filterSections, saveFilterSections, resetToDefault: resetFilterOptions } = useFilterOptions();
   
   // --- SECURITY STATE ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -71,7 +76,7 @@ const AdminPage: React.FC = () => {
   const [shake, setShake] = useState(false); // For animation
   
   // --- MAIN APP STATE ---
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'add' | 'edit' | 'categories' | 'trending' | 'collections'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'add' | 'edit' | 'categories' | 'filters' | 'trending' | 'collections'>('dashboard');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -89,6 +94,10 @@ const AdminPage: React.FC = () => {
   const [localCategories, setLocalCategories] = useState<NavItem[]>([]);
   const [catExpanded, setCatExpanded] = useState<string | null>(null);
   const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
+    const [localSortOptions, setLocalSortOptions] = useState<string[]>([]);
+    const [newSortOption, setNewSortOption] = useState('');
+    const [localFilterSections, setLocalFilterSections] = useState<MegaMenuSection[]>([]);
+    const [newFilterSectionTitle, setNewFilterSectionTitle] = useState('');
   
   // MODAL STATES
   const [modalType, setModalType] = useState<'none' | 'add-cat' | 'rename-cat' | 'add-section' | 'add-item' | 'delete-cat' | 'delete-section' | 'delete-item'>('none');
@@ -134,6 +143,14 @@ const AdminPage: React.FC = () => {
   useEffect(() => {
     setLocalCategories(categories);
   }, [categories]);
+
+    useEffect(() => {
+        setLocalSortOptions(sortOptions);
+    }, [sortOptions]);
+
+    useEffect(() => {
+        setLocalFilterSections(filterSections);
+    }, [filterSections]);
 
   // Database Connection Mock
   useEffect(() => {
@@ -562,6 +579,116 @@ const AdminPage: React.FC = () => {
       }
   };
 
+  const updateSortOption = (index: number, value: string) => {
+      setLocalSortOptions(prev => {
+          const next = [...prev];
+          next[index] = value;
+          return next;
+      });
+  };
+
+  const removeSortOption = (index: number) => {
+      setLocalSortOptions(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const moveSortOption = (index: number, direction: 'up' | 'down') => {
+      if (direction === 'up' && index === 0) return;
+      if (direction === 'down' && index === localSortOptions.length - 1) return;
+      const next = [...localSortOptions];
+      const target = direction === 'up' ? index - 1 : index + 1;
+      [next[index], next[target]] = [next[target], next[index]];
+      setLocalSortOptions(next);
+  };
+
+  const addSortOption = () => {
+      const trimmed = newSortOption.trim();
+      if (!trimmed) return;
+      setLocalSortOptions(prev => [...prev, trimmed]);
+      setNewSortOption('');
+  };
+
+  const handleSaveSortOptions = async () => {
+      try {
+          const cleaned = localSortOptions.map(opt => opt.trim()).filter(Boolean);
+          await saveSortOptions(cleaned);
+          alert('✅ Sort options updated successfully.');
+      } catch (e) {
+          console.error(e);
+          alert('Failed to save sort options.');
+      }
+  };
+
+  const updateFilterSectionTitle = (index: number, value: string) => {
+      setLocalFilterSections(prev => {
+          const next = [...prev];
+          next[index] = { ...next[index], title: value };
+          return next;
+      });
+  };
+
+  const addFilterSection = () => {
+      const trimmed = newFilterSectionTitle.trim();
+      if (!trimmed) return;
+      setLocalFilterSections(prev => [...prev, { title: trimmed, items: [] }]);
+      setNewFilterSectionTitle('');
+  };
+
+  const removeFilterSection = (index: number) => {
+      setLocalFilterSections(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const moveFilterSection = (index: number, direction: 'up' | 'down') => {
+      if (direction === 'up' && index === 0) return;
+      if (direction === 'down' && index === localFilterSections.length - 1) return;
+      const next = [...localFilterSections];
+      const target = direction === 'up' ? index - 1 : index + 1;
+      [next[index], next[target]] = [next[target], next[index]];
+      setLocalFilterSections(next);
+  };
+
+  const updateFilterItem = (sectionIndex: number, itemIndex: number, value: string) => {
+      setLocalFilterSections(prev => {
+          const next = [...prev];
+          const items = [...next[sectionIndex].items];
+          items[itemIndex] = value;
+          next[sectionIndex] = { ...next[sectionIndex], items };
+          return next;
+      });
+  };
+
+  const addFilterItem = (sectionIndex: number) => {
+      setLocalFilterSections(prev => {
+          const next = [...prev];
+          next[sectionIndex] = { ...next[sectionIndex], items: [...next[sectionIndex].items, ''] };
+          return next;
+      });
+  };
+
+  const removeFilterItem = (sectionIndex: number, itemIndex: number) => {
+      setLocalFilterSections(prev => {
+          const next = [...prev];
+          const items = next[sectionIndex].items.filter((_, idx) => idx !== itemIndex);
+          next[sectionIndex] = { ...next[sectionIndex], items };
+          return next;
+      });
+  };
+
+  const handleSaveFilterOptions = async () => {
+      try {
+          const cleaned = localFilterSections
+              .map(section => ({
+                  title: section.title.trim(),
+                  items: section.items.map(item => item.trim()).filter(Boolean)
+              }))
+              .filter(section => section.title && section.items.length > 0);
+          await saveFilterSections(cleaned);
+          alert('✅ Filter options updated successfully.');
+      } catch (e) {
+          console.error(e);
+          alert('Failed to save filter options.');
+      }
+  };
+
   const filteredProducts = products.filter(product => {
     const safeCategories = product.category || [];
     const matchesCategory = selectedCategoryFilter === 'All' || safeCategories.includes(selectedCategoryFilter);
@@ -769,6 +896,13 @@ const AdminPage: React.FC = () => {
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'categories' ? 'bg-gold-50 text-gold-700' : 'text-gray-600 hover:bg-gray-50'}`}
             >
                 <List size={18} /> Category Manager
+            </button>
+
+            <button 
+                onClick={() => setActiveTab('filters')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'filters' ? 'bg-gold-50 text-gold-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+                <Filter size={18} /> Filter Options
             </button>
 
             <button 
@@ -1048,6 +1182,62 @@ const AdminPage: React.FC = () => {
                         </button>
                      </div>
                  </div>
+                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                         <div>
+                             <h3 className="text-lg font-bold text-gray-900">Sort Options Manager</h3>
+                             <p className="text-xs text-gray-500">These appear on the Collections page for customers.</p>
+                         </div>
+                         <div className="flex gap-3">
+                             <button onClick={handleSaveSortOptions} className="bg-brand-black text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-gold-600 transition">
+                                 <Save size={14} /> Save Sort Options
+                             </button>
+                             <button onClick={resetSortOptions} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-gray-50 transition">
+                                 <RefreshCw size={14} /> Reset Defaults
+                             </button>
+                         </div>
+                     </div>
+                     <div className="space-y-3">
+                         {localSortOptions.length === 0 ? (
+                             <p className="text-sm text-gray-500">No sort options configured.</p>
+                         ) : (
+                             localSortOptions.map((option, idx) => (
+                                 <div key={`${option}-${idx}`} className="flex items-center gap-3 p-2 rounded-lg border border-gray-100">
+                                     <div className="flex flex-col">
+                                         <button type="button" onClick={() => moveSortOption(idx, 'up')} className="p-1 text-gray-400 hover:text-gold-600" disabled={idx === 0}>
+                                             <ChevronUp size={16} />
+                                         </button>
+                                         <button type="button" onClick={() => moveSortOption(idx, 'down')} className="p-1 text-gray-400 hover:text-gold-600" disabled={idx === localSortOptions.length - 1}>
+                                             <ChevronDown size={16} />
+                                         </button>
+                                     </div>
+                                     <input
+                                         type="text"
+                                         value={option}
+                                         onChange={(e) => updateSortOption(idx, e.target.value)}
+                                         className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                         placeholder="Sort option label"
+                                     />
+                                     <button type="button" onClick={() => removeSortOption(idx)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                         <Trash2 size={16} />
+                                     </button>
+                                 </div>
+                             ))
+                         )}
+                     </div>
+                     <div className="flex flex-col md:flex-row gap-3 mt-4">
+                         <input
+                             type="text"
+                             value={newSortOption}
+                             onChange={(e) => setNewSortOption(e.target.value)}
+                             placeholder="Add new sort option"
+                             className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                         />
+                         <button onClick={addSortOption} className="bg-gold-500 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-gold-600 transition">
+                             <Plus size={14} /> Add Option
+                         </button>
+                     </div>
+                 </div>
                  <div className="space-y-4">
                      {localCategories.map((cat, catIndex) => (
                          <div 
@@ -1133,6 +1323,93 @@ const AdminPage: React.FC = () => {
                              )}
                          </div>
                      ))}
+                 </div>
+             </div>
+        )}
+
+        {/* VIEW: FILTER OPTIONS */}
+        {activeTab === 'filters' && (
+             <div className="max-w-4xl mx-auto animate-fade-in-up pb-20">
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                     <div>
+                        <button onClick={() => setActiveTab('dashboard')} className="md:hidden flex items-center gap-1 text-gray-500 text-sm font-medium mb-4">
+                            <ChevronRight size={16} className="rotate-180"/> Back to Dashboard
+                        </button>
+                        <h2 className="text-2xl font-bold text-gray-900">Filter Options</h2>
+                        <p className="text-gray-500 text-sm mt-1">Manage the global filters shown on Collections.</p>
+                     </div>
+                     <div className="flex gap-3 w-full md:w-auto">
+                        <button onClick={handleSaveFilterOptions} className="flex-1 md:flex-none bg-brand-black text-white px-5 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-gold-600 transition shadow-lg text-sm">
+                            <Save size={18} /> Save Filters
+                        </button>
+                        <button onClick={resetFilterOptions} className="flex-1 md:flex-none border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-gray-50 transition text-sm">
+                            <RefreshCw size={18} /> Reset Defaults
+                        </button>
+                     </div>
+                 </div>
+
+                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                     <div className="space-y-4">
+                         {localFilterSections.length === 0 ? (
+                             <p className="text-sm text-gray-500">No filter sections configured.</p>
+                         ) : (
+                             localFilterSections.map((section, sectionIndex) => (
+                                 <div key={`${section.title}-${sectionIndex}`} className="border border-gray-100 rounded-lg p-4">
+                                     <div className="flex flex-col md:flex-row md:items-center gap-3 mb-3">
+                                         <div className="flex flex-col">
+                                             <button type="button" onClick={() => moveFilterSection(sectionIndex, 'up')} className="p-1 text-gray-400 hover:text-gold-600" disabled={sectionIndex === 0}>
+                                                 <ChevronUp size={16} />
+                                             </button>
+                                             <button type="button" onClick={() => moveFilterSection(sectionIndex, 'down')} className="p-1 text-gray-400 hover:text-gold-600" disabled={sectionIndex === localFilterSections.length - 1}>
+                                                 <ChevronDown size={16} />
+                                             </button>
+                                         </div>
+                                         <input
+                                             type="text"
+                                             value={section.title}
+                                             onChange={(e) => updateFilterSectionTitle(sectionIndex, e.target.value)}
+                                             className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                             placeholder="Section title"
+                                         />
+                                         <button type="button" onClick={() => removeFilterSection(sectionIndex)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                             <Trash2 size={16} />
+                                         </button>
+                                     </div>
+                                     <div className="space-y-2">
+                                         {section.items.map((item, itemIndex) => (
+                                             <div key={`${section.title}-${itemIndex}`} className="flex items-center gap-2">
+                                                 <input
+                                                     type="text"
+                                                     value={item}
+                                                     onChange={(e) => updateFilterItem(sectionIndex, itemIndex, e.target.value)}
+                                                     className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                                     placeholder="Filter option"
+                                                 />
+                                                 <button type="button" onClick={() => removeFilterItem(sectionIndex, itemIndex)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                                     <MinusCircle size={16} />
+                                                 </button>
+                                             </div>
+                                         ))}
+                                         <button type="button" onClick={() => addFilterItem(sectionIndex)} className="text-xs font-bold text-gold-600 hover:text-gold-700 flex items-center gap-2">
+                                             <Plus size={12} /> Add Option
+                                         </button>
+                                     </div>
+                                 </div>
+                             ))
+                         )}
+                     </div>
+                     <div className="flex flex-col md:flex-row gap-3 mt-4">
+                         <input
+                             type="text"
+                             value={newFilterSectionTitle}
+                             onChange={(e) => setNewFilterSectionTitle(e.target.value)}
+                             placeholder="Add new filter section"
+                             className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                         />
+                         <button onClick={addFilterSection} className="bg-gold-500 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-gold-600 transition">
+                             <Plus size={14} /> Add Section
+                         </button>
+                     </div>
                  </div>
              </div>
         )}
