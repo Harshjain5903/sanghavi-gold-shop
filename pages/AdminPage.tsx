@@ -211,6 +211,7 @@ const AdminPage: React.FC = () => {
     subcategory: '',
     image: '',
     images: [], 
+        videos: [],
     description: '',
     specifications: DEFAULT_SPECS, 
     inStock: true,
@@ -365,47 +366,119 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'product' | 'category', catIndex?: number) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setUploading(true);
-    try {
-      if (target === 'product') {
-        const newImageUrls: string[] = [];
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            if (file.size > 5 * 1024 * 1024) continue; 
-            const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            newImageUrls.push(downloadURL);
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'product' | 'category', catIndex?: number) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        setUploading(true);
+        try {
+            const maxBytes = 100 * 1024 * 1024; // 100MB per image
+            const maxImages = 50;
+            const skipped: string[] = [];
+
+            if (target === 'product') {
+                const newImageUrls: string[] = [];
+                const existingImages = formData.images || (formData.image ? [formData.image] : []);
+                const remainingSlots = Math.max(0, maxImages - existingImages.length);
+
+                for (let i = 0; i < files.length && newImageUrls.length < remainingSlots; i++) {
+                    const file = files[i];
+                    if (file.size > maxBytes) {
+                        skipped.push(`${file.name} (over 100MB)`);
+                        continue;
+                    }
+                    const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
+                    const snapshot = await uploadBytes(storageRef, file, { contentType: file.type || 'image/jpeg' });
+                    const downloadURL = await getDownloadURL(snapshot.ref);
+                    newImageUrls.push(downloadURL);
+                }
+
+                if (newImageUrls.length === 0) {
+                    const reason = skipped.length > 0 ? `Skipped: ${skipped.join(', ')}` : 'No valid files selected.';
+                    alert(`⚠️ Upload Failed. ${reason}`);
+                    return;
+                }
+
+                setFormData(prev => {
+                    const currentImages = prev.images || (prev.image ? [prev.image] : []);
+                    const updatedImages = [...currentImages, ...newImageUrls];
+                    return {
+                        ...prev,
+                        images: updatedImages,
+                        image: updatedImages.length > 0 ? updatedImages[0] : ''
+                    };
+                });
+            } else if (target === 'category' && catIndex !== undefined) {
+                const file = files[0];
+                if (file.size > maxBytes) {
+                    alert('⚠️ Upload Failed. Image is larger than 100MB.');
+                    return;
+                }
+                const storageRef = ref(storage, `categories/${Date.now()}_${file.name}`);
+                const snapshot = await uploadBytes(storageRef, file, { contentType: file.type || 'image/jpeg' });
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                const updatedCats = [...localCategories];
+                updatedCats[catIndex] = { ...updatedCats[catIndex], image: downloadURL };
+                setLocalCategories(updatedCats);
+                await saveCategories(updatedCats);
+            }
+        } catch (error: any) {
+            console.error("Error uploading image:", error);
+            const message = error?.message || 'Unknown error';
+            alert(`⚠️ Upload Failed. ${message}`);
+        } finally {
+            setUploading(false);
+            if (e.target) {
+                e.target.value = '';
+            }
         }
-        setFormData(prev => {
-            const currentImages = prev.images || (prev.image ? [prev.image] : []);
-            const updatedImages = [...currentImages, ...newImageUrls];
-            return { 
-                ...prev, 
-                images: updatedImages,
-                image: updatedImages.length > 0 ? updatedImages[0] : ''
-            };
-        });
-      } else if (target === 'category' && catIndex !== undefined) {
-          const file = files[0];
-          const storageRef = ref(storage, `categories/${Date.now()}_${file.name}`);
-          const snapshot = await uploadBytes(storageRef, file);
-          const downloadURL = await getDownloadURL(snapshot.ref);
-          const updatedCats = [...localCategories];
-          updatedCats[catIndex] = { ...updatedCats[catIndex], image: downloadURL };
-          setLocalCategories(updatedCats);
-          await saveCategories(updatedCats);
-      }
-    } catch (error: any) {
-      console.error("Error uploading image:", error);
-      alert("⚠️ Upload Failed. Please try again.");
-    } finally {
-      setUploading(false);
-    }
-  };
+    };
+
+    const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        setUploading(true);
+        try {
+            const maxBytes = 500 * 1024 * 1024; // 500MB per video
+            const maxVideos = 10;
+            const skipped: string[] = [];
+
+            const newVideoUrls: string[] = [];
+            const existingVideos = formData.videos || [];
+            const remainingSlots = Math.max(0, maxVideos - existingVideos.length);
+
+            for (let i = 0; i < files.length && newVideoUrls.length < remainingSlots; i++) {
+                const file = files[i];
+                if (file.size > maxBytes) {
+                    skipped.push(`${file.name} (over 500MB)`);
+                    continue;
+                }
+                const storageRef = ref(storage, `products/videos/${Date.now()}_${file.name}`);
+                const snapshot = await uploadBytes(storageRef, file, { contentType: file.type || 'video/mp4' });
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                newVideoUrls.push(downloadURL);
+            }
+
+            if (newVideoUrls.length === 0) {
+                const reason = skipped.length > 0 ? `Skipped: ${skipped.join(', ')}` : 'No valid files selected.';
+                alert(`⚠️ Upload Failed. ${reason}`);
+                return;
+            }
+
+            setFormData(prev => ({
+                ...prev,
+                videos: [...(prev.videos || []), ...newVideoUrls]
+            }));
+        } catch (error: any) {
+            console.error('Error uploading video:', error);
+            const message = error?.message || 'Unknown error';
+            alert(`⚠️ Upload Failed. ${message}`);
+        } finally {
+            setUploading(false);
+            if (e.target) {
+                e.target.value = '';
+            }
+        }
+    };
 
   const removeProductImage = (index: number) => {
       setFormData(prev => {
@@ -415,6 +488,17 @@ const AdminPage: React.FC = () => {
               ...prev,
               images: currentImages,
               image: currentImages.length > 0 ? currentImages[0] : '' // Update primary image
+          };
+      });
+  };
+
+  const removeProductVideo = (index: number) => {
+      setFormData(prev => {
+          const currentVideos = [...(prev.videos || [])];
+          currentVideos.splice(index, 1);
+          return {
+              ...prev,
+              videos: currentVideos
           };
       });
   };
@@ -484,7 +568,8 @@ const AdminPage: React.FC = () => {
     if (imgs.length === 0 && product.image) {
         imgs = [product.image];
     }
-    setFormData({ ...product, specifications: specs, images: imgs, priceOnRequest: product.priceOnRequest || false });
+    const vids = product.videos || [];
+    setFormData({ ...product, specifications: specs, images: imgs, videos: vids, priceOnRequest: product.priceOnRequest || false });
     setActiveTab('edit');
   };
 
@@ -1536,18 +1621,16 @@ const AdminPage: React.FC = () => {
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
                                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Product Gallery</h3>
-                                <span className="text-xs text-gray-500">{(formData.images || []).length}/4 Images</span>
+                                <span className="text-xs text-gray-500">{(formData.images || []).length} Images</span>
                             </div>
                             
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                                 {/* Upload Button */}
-                                {(formData.images || []).length < 4 && (
-                                    <label className={`aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                        <input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(e, 'product')} className="hidden" disabled={uploading} />
+                                <label className={`aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    <input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(e, 'product')} className="hidden" disabled={uploading} />
                                         {uploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
                                         <span className="text-xs font-bold text-gray-500 mt-2">Upload</span>
                                     </label>
-                                )}
 
                                 {/* Image Previews */}
                                 {(formData.images || []).map((img, idx) => (
@@ -1573,6 +1656,29 @@ const AdminPage: React.FC = () => {
                                         }
                                     }}
                                 />
+                            </div>
+                        </div>
+
+                        {/* Media (Videos) */}
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Product Videos</h3>
+                                <span className="text-xs text-gray-500">{(formData.videos || []).length} Videos</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                <label className={`h-32 rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    <input type="file" accept="video/*" multiple onChange={handleVideoUpload} className="hidden" disabled={uploading} />
+                                    {uploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
+                                    <span className="text-xs font-bold text-gray-500 mt-2">Upload Video</span>
+                                </label>
+
+                                {(formData.videos || []).map((videoUrl, idx) => (
+                                    <div key={idx} className="h-32 rounded-lg border border-gray-200 relative group overflow-hidden bg-gray-50">
+                                        <video src={videoUrl} className="w-full h-full object-cover" controls />
+                                        <button type="button" onClick={() => removeProductVideo(idx)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition shadow-sm"><X size={12} /></button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 

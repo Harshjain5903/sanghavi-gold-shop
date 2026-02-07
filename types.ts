@@ -28,6 +28,7 @@ export interface Product {
   subcategory?: string; // e.g., "Studs", "Jhumkas", "Chains"
   image: string; // Keep for backward compatibility (serves as primary image)
   images?: string[]; // New: Multiple images support
+  videos?: string[]; // Optional: Product videos
   weight?: string; // Legacy support
   purity?: string; // Legacy support
   specifications?: ProductSpecification[]; // New Dynamic Specs
