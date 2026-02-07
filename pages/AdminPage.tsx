@@ -479,10 +479,12 @@ const AdminPage: React.FC = () => {
       }
 
     // 4. Specs Standardization
-    const weightSpec = finalData.specifications?.find(s => s.key.toLowerCase().includes('weight'));
-    const puritySpec = finalData.specifications?.find(s => s.key.toLowerCase() === 'purity');
-    if (weightSpec && weightSpec.value?.trim()) finalData.weight = weightSpec.value;
-    if (puritySpec && puritySpec.value?.trim()) finalData.purity = puritySpec.value;
+      const weightSpec = finalData.specifications?.find(s => s.key.toLowerCase().includes('weight'));
+      const puritySpec = finalData.specifications?.find(s => s.key.toLowerCase() === 'purity');
+      if (!finalData.weight?.trim() && weightSpec && weightSpec.value?.trim()) {
+          finalData.weight = weightSpec.value;
+      }
+      if (puritySpec && puritySpec.value?.trim()) finalData.purity = puritySpec.value;
 
       if (activeTab === 'add') {
         await addProduct(finalData);
@@ -1667,7 +1669,7 @@ const AdminPage: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 text-sm font-medium">
                                             {product.cardDisplayMode === 'weight' ? (
-                                                product.weight?.trim() ? product.weight : '--'
+                                                product.weight?.trim() ? `Wt: ${product.weight}` : '--'
                                             ) : product.cardDisplayMode === 'none' ? (
                                                 '--'
                                             ) : product.priceOnRequest ? (
