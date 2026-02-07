@@ -25,6 +25,7 @@ const Navbar: React.FC = () => {
   const { cartCount } = useCart();
   const { isAuthenticated } = useAuth();
     const { rates } = useRates();
+    const [extraGoldPurity, setExtraGoldPurity] = useState<'gold24k' | 'gold18k'>('gold24k');
   
   // Mobile Menu State
   const [mobileSubMenu, setMobileSubMenu] = useState<string | null>(null);
@@ -180,19 +181,33 @@ const Navbar: React.FC = () => {
         <div className="bg-gradient-to-r from-gray-900 via-brand-black to-gray-900 text-white text-xs py-2 px-4 flex justify-center items-center relative z-50">
             <div className="flex-1 text-center flex flex-col items-center gap-1">
                 <span className="font-bold tracking-wide cursor-pointer" onClick={scrollToStore}>Visit our store</span>
-                {hasRates && (
-                  <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] sm:text-xs font-semibold text-gray-100">
-                     <span className="inline-flex items-center gap-1 text-emerald-300">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        LIVE RATES
-                     </span>
-                     <span>Gold 24K: {formatPer10g(rates.gold24k)}</span>
-                     <span>Gold 22K: {formatPer10g(rates.gold22k)}</span>
-                     <span>Gold 18K: {formatPer10g(rates.gold18k)}</span>
-                     <span>Silver: {formatPerKg(rates.silver)}</span>
-                     {updatedText && <span className="text-gray-300">({updatedText})</span>}
-                  </div>
-                )}
+                        {hasRates && (
+                            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] sm:text-xs font-semibold text-gray-100">
+                                <span className="inline-flex items-center gap-1 text-emerald-300">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    LIVE RATES
+                                </span>
+                                <span>Gold 22kt: {formatPer10g(rates.gold22k)}</span>
+                                <div className="inline-flex items-center gap-1">
+                                    <select
+                                        value={extraGoldPurity}
+                                        onChange={(e) => setExtraGoldPurity(e.target.value as 'gold24k' | 'gold18k')}
+                                        className="bg-white/10 border border-white/20 rounded px-1 py-0.5 text-[10px] sm:text-xs text-white"
+                                        aria-label="Select gold purity"
+                                    >
+                                        <option value="gold24k">24kt</option>
+                                        <option value="gold18k">18kt</option>
+                                    </select>
+                                    <span>
+                                        {extraGoldPurity === 'gold24k'
+                                            ? formatPer10g(rates.gold24k)
+                                            : formatPer10g(rates.gold18k)}
+                                    </span>
+                                </div>
+                                <span>Silver: {formatPerKg(rates.silver)}</span>
+                                {updatedText && <span className="text-gray-300">({updatedText})</span>}
+                            </div>
+                        )}
             </div>
         </div>
 
