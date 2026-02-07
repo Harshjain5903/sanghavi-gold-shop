@@ -1556,7 +1556,40 @@ const AdminPage: React.FC = () => {
                          </div>
                      </div>
 
-                     <div className="mt-4 text-xs text-gray-500">
+                                         <div className="mt-6 rounded-lg border border-gray-100 bg-gray-50 p-4">
+                                                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Preview Prices</div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left text-xs">
+                                                        <thead className="text-gray-500">
+                                                            <tr>
+                                                                <th className="py-2 pr-4">Metal</th>
+                                                                <th className="py-2 pr-4">1g</th>
+                                                                <th className="py-2 pr-4">10g</th>
+                                                                <th className="py-2 pr-4">100g</th>
+                                                                <th className="py-2 pr-4">1kg</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="text-gray-800">
+                                                            {([
+                                                                { label: 'Gold 24K', value: parseRateValue(localRates.gold24k) },
+                                                                { label: 'Gold 22K', value: parseRateValue(localRates.gold22k) },
+                                                                { label: 'Gold 18K', value: parseRateValue(localRates.gold18k) },
+                                                                { label: 'Silver', value: parseRateValue(localRates.silver) }
+                                                            ]).map((row) => (
+                                                                <tr key={row.label} className="border-t border-gray-200">
+                                                                    <td className="py-2 pr-4 font-semibold">{row.label}</td>
+                                                                    <td className="py-2 pr-4">INR {row.value.toLocaleString('en-IN')}</td>
+                                                                    <td className="py-2 pr-4">INR {(row.value * 10).toLocaleString('en-IN')}</td>
+                                                                    <td className="py-2 pr-4">INR {(row.value * 100).toLocaleString('en-IN')}</td>
+                                                                    <td className="py-2 pr-4">INR {(row.value * 1000).toLocaleString('en-IN')}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                         </div>
+
+                            <div className="mt-4 text-xs text-gray-500">
                         Last updated: {rates.updatedAt ? new Date(rates.updatedAt).toLocaleString('en-IN') : 'Not set'}
                      </div>
 
