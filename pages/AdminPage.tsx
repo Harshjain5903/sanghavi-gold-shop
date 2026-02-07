@@ -101,12 +101,11 @@ const AdminPage: React.FC = () => {
     const [newSortOption, setNewSortOption] = useState('');
     const [localFilterSections, setLocalFilterSections] = useState<MegaMenuSection[]>([]);
     const [newFilterSectionTitle, setNewFilterSectionTitle] = useState('');
-    const [localRates, setLocalRates] = useState({
-        gold22k: '',
-        gold24k: '',
-        gold18k: '',
-        silver: ''
-    });
+    const [goldPurity, setGoldPurity] = useState<'gold22k' | 'gold24k' | 'gold18k'>('gold22k');
+    const [goldUnit, setGoldUnit] = useState<'1g' | '10g' | '100g' | '1kg'>('10g');
+    const [silverUnit, setSilverUnit] = useState<'1g' | '10g' | '100g' | '1kg'>('1kg');
+    const [goldInput, setGoldInput] = useState('');
+    const [silverInput, setSilverInput] = useState('');
     const [ratesSaving, setRatesSaving] = useState(false);
     const [ratesMessage, setRatesMessage] = useState('');
   
@@ -163,18 +162,27 @@ const AdminPage: React.FC = () => {
         setLocalFilterSections(filterSections);
     }, [filterSections]);
 
+    const unitMultiplier = (unit: '1g' | '10g' | '100g' | '1kg') => {
+        if (unit === '10g') return 10;
+        if (unit === '100g') return 100;
+        if (unit === '1kg') return 1000;
+        return 1;
+    };
+
+    const perGramToUnit = (value: number, unit: '1g' | '10g' | '100g' | '1kg') => value * unitMultiplier(unit);
+    const unitToPerGram = (value: number, unit: '1g' | '10g' | '100g' | '1kg') => value / unitMultiplier(unit);
+
     const syncRatesInputs = (nextRates: MetalRates) => {
-        setLocalRates({
-            gold22k: nextRates.gold22k ? String(nextRates.gold22k) : '',
-            gold24k: nextRates.gold24k ? String(nextRates.gold24k) : '',
-            gold18k: nextRates.gold18k ? String(nextRates.gold18k) : '',
-            silver: nextRates.silver ? String(nextRates.silver) : ''
-        });
+        const safeRates = nextRates || DEFAULT_METAL_RATES;
+        const goldValue = safeRates[goldPurity] || 0;
+        const silverValue = safeRates.silver || 0;
+        setGoldInput(goldValue ? String(perGramToUnit(goldValue, goldUnit)) : '');
+        setSilverInput(silverValue ? String(perGramToUnit(silverValue, silverUnit)) : '');
     };
 
     useEffect(() => {
         syncRatesInputs(rates || DEFAULT_METAL_RATES);
-    }, [rates]);
+    }, [rates, goldPurity, goldUnit, silverUnit]);
 
   // Database Connection Mock
   useEffect(() => {
@@ -704,10 +712,6 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  const updateRateInput = (key: keyof typeof localRates, value: string) => {
-      setLocalRates(prev => ({ ...prev, [key]: value }));
-  };
-
   const parseRateValue = (value: string) => {
       const num = Number(value);
       return Number.isFinite(num) && num > 0 ? num : 0;
@@ -717,11 +721,13 @@ const AdminPage: React.FC = () => {
       setRatesMessage('');
       setRatesSaving(true);
       try {
+          const baseRates = rates || DEFAULT_METAL_RATES;
+          const goldValue = unitToPerGram(parseRateValue(goldInput), goldUnit);
+          const silverValue = unitToPerGram(parseRateValue(silverInput), silverUnit);
           const nextRates: MetalRates = {
-              gold22k: parseRateValue(localRates.gold22k),
-              gold24k: parseRateValue(localRates.gold24k),
-              gold18k: parseRateValue(localRates.gold18k),
-              silver: parseRateValue(localRates.silver),
+              ...baseRates,
+              [goldPurity]: goldValue,
+              silver: silverValue,
               updatedAt: new Date().toISOString()
           };
           await saveRates(nextRates);
@@ -1505,89 +1511,76 @@ const AdminPage: React.FC = () => {
                  </div>
 
                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div>
-                             <label className="block text-sm font-medium text-gray-900 mb-1">Gold 22K (INR per gram)</label>
-                             <input
-                                 type="number"
-                                 value={localRates.gold22k}
-                                 onChange={(e) => updateRateInput('gold22k', e.target.value)}
-                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
-                                 placeholder="e.g. 6200"
-                                 min="0"
-                                 step="0.01"
-                             />
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div className="rounded-lg border border-gray-100 p-4">
+                             <div className="flex items-center justify-between gap-2 mb-3">
+                                 <label className="text-sm font-bold text-gray-900">Gold Rate</label>
+                                 <select
+                                     value={goldPurity}
+                                     onChange={(e) => setGoldPurity(e.target.value as 'gold22k' | 'gold24k' | 'gold18k')}
+                                     className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 bg-white"
+                                 >
+                                     <option value="gold22k">22K</option>
+                                     <option value="gold24k">24K</option>
+                                     <option value="gold18k">18K</option>
+                                 </select>
+                             </div>
+                             <div className="flex items-center gap-2">
+                                 <input
+                                     type="number"
+                                     value={goldInput}
+                                     onChange={(e) => setGoldInput(e.target.value)}
+                                     className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                     placeholder="Enter rate"
+                                     min="0"
+                                     step="0.01"
+                                 />
+                                 <select
+                                     value={goldUnit}
+                                     onChange={(e) => setGoldUnit(e.target.value as '1g' | '10g' | '100g' | '1kg')}
+                                     className="border border-gray-200 rounded-lg px-2 py-2 text-xs text-gray-700 bg-white"
+                                 >
+                                     <option value="1g">1g</option>
+                                     <option value="10g">10g</option>
+                                     <option value="100g">100g</option>
+                                     <option value="1kg">1kg</option>
+                                 </select>
+                             </div>
+                             <div className="mt-2 text-xs text-gray-500">
+                                 Stored as per-gram: INR {unitToPerGram(parseRateValue(goldInput), goldUnit).toLocaleString('en-IN')}/g
+                             </div>
                          </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-900 mb-1">Gold 24K (INR per gram)</label>
-                             <input
-                                 type="number"
-                                 value={localRates.gold24k}
-                                 onChange={(e) => updateRateInput('gold24k', e.target.value)}
-                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
-                                 placeholder="e.g. 6800"
-                                 min="0"
-                                 step="0.01"
-                             />
-                         </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-900 mb-1">Gold 18K (INR per gram)</label>
-                             <input
-                                 type="number"
-                                 value={localRates.gold18k}
-                                 onChange={(e) => updateRateInput('gold18k', e.target.value)}
-                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
-                                 placeholder="e.g. 5100"
-                                 min="0"
-                                 step="0.01"
-                             />
-                         </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-900 mb-1">Silver (INR per gram)</label>
-                             <input
-                                 type="number"
-                                 value={localRates.silver}
-                                 onChange={(e) => updateRateInput('silver', e.target.value)}
-                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
-                                 placeholder="e.g. 85"
-                                 min="0"
-                                 step="0.01"
-                             />
+
+                         <div className="rounded-lg border border-gray-100 p-4">
+                             <div className="flex items-center justify-between gap-2 mb-3">
+                                 <label className="text-sm font-bold text-gray-900">Silver Rate</label>
+                             </div>
+                             <div className="flex items-center gap-2">
+                                 <input
+                                     type="number"
+                                     value={silverInput}
+                                     onChange={(e) => setSilverInput(e.target.value)}
+                                     className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                     placeholder="Enter rate"
+                                     min="0"
+                                     step="0.01"
+                                 />
+                                 <select
+                                     value={silverUnit}
+                                     onChange={(e) => setSilverUnit(e.target.value as '1g' | '10g' | '100g' | '1kg')}
+                                     className="border border-gray-200 rounded-lg px-2 py-2 text-xs text-gray-700 bg-white"
+                                 >
+                                     <option value="1g">1g</option>
+                                     <option value="10g">10g</option>
+                                     <option value="100g">100g</option>
+                                     <option value="1kg">1kg</option>
+                                 </select>
+                             </div>
+                             <div className="mt-2 text-xs text-gray-500">
+                                 Stored as per-gram: INR {unitToPerGram(parseRateValue(silverInput), silverUnit).toLocaleString('en-IN')}/g
+                             </div>
                          </div>
                      </div>
-
-                                         <div className="mt-6 rounded-lg border border-gray-100 bg-gray-50 p-4">
-                                                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Preview Prices</div>
-                                                <div className="overflow-x-auto">
-                                                    <table className="w-full text-left text-xs">
-                                                        <thead className="text-gray-500">
-                                                            <tr>
-                                                                <th className="py-2 pr-4">Metal</th>
-                                                                <th className="py-2 pr-4">1g</th>
-                                                                <th className="py-2 pr-4">10g</th>
-                                                                <th className="py-2 pr-4">100g</th>
-                                                                <th className="py-2 pr-4">1kg</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="text-gray-800">
-                                                            {([
-                                                                { label: 'Gold 24K', value: parseRateValue(localRates.gold24k) },
-                                                                { label: 'Gold 22K', value: parseRateValue(localRates.gold22k) },
-                                                                { label: 'Gold 18K', value: parseRateValue(localRates.gold18k) },
-                                                                { label: 'Silver', value: parseRateValue(localRates.silver) }
-                                                            ]).map((row) => (
-                                                                <tr key={row.label} className="border-t border-gray-200">
-                                                                    <td className="py-2 pr-4 font-semibold">{row.label}</td>
-                                                                    <td className="py-2 pr-4">INR {row.value.toLocaleString('en-IN')}</td>
-                                                                    <td className="py-2 pr-4">INR {(row.value * 10).toLocaleString('en-IN')}</td>
-                                                                    <td className="py-2 pr-4">INR {(row.value * 100).toLocaleString('en-IN')}</td>
-                                                                    <td className="py-2 pr-4">INR {(row.value * 1000).toLocaleString('en-IN')}</td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                         </div>
 
                             <div className="mt-4 text-xs text-gray-500">
                         Last updated: {rates.updatedAt ? new Date(rates.updatedAt).toLocaleString('en-IN') : 'Not set'}
