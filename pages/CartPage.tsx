@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext';
-import { Trash2, ArrowRight, ShieldCheck, ShoppingBag, Video, MessageCircle, Square, CheckSquare, Plus, Minus, PlusCircle, ArrowLeft } from 'lucide-react';
+import { Trash2, ArrowRight, ShieldCheck, ShoppingBag, Video, MessageCircle, Square, CheckSquare, Plus, Minus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import AuthModal from '../components/AuthModal';
 import { SHOP_INFO } from '../constants';
 
 const CartPage: React.FC = () => {
   const { items, removeFromCart, updateQuantity, cartTotal, cartCount } = useCart();
-  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   
   // Selection State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -58,17 +54,34 @@ const CartPage: React.FC = () => {
   }
 
   const handleProceedToCheckout = () => {
-    if (isAuthenticated) {
-      navigate('/checkout');
-    } else {
-      setIsAuthModalOpen(true);
-    }
-  };
-
-  const handleLoginSuccess = () => {
-    setIsAuthModalOpen(false);
     navigate('/checkout');
   };
+
+  const isPricedItem = (item: (typeof items)[number]) => {
+    const displayMode = item.cardDisplayMode || 'price';
+    const isPriceOnRequest = item.priceOnRequest === true;
+    const hasPrice = item.price && item.price > 0;
+    return displayMode === 'price' && hasPrice && !isPriceOnRequest;
+  };
+
+  const getItemPriceLabel = (item: (typeof items)[number]) => {
+    const displayMode = item.cardDisplayMode || 'price';
+    const isPriceOnRequest = item.priceOnRequest === true;
+    const hasPrice = item.price && item.price > 0;
+    const showWeight = displayMode === 'weight' && item.weight && item.weight.trim().length > 0;
+
+    if (displayMode === 'price' && hasPrice && !isPriceOnRequest) {
+      return `₹${item.price.toLocaleString('en-IN')}`;
+    }
+    if (showWeight) {
+      return `Wt: ${item.weight}`;
+    }
+    return 'Price on request';
+  };
+
+  const pricedItemCount = items.reduce((count, item) => count + (isPricedItem(item) ? item.quantity : 0), 0);
+  const unpricedItemCount = items.reduce((count, item) => count + (!isPricedItem(item) ? item.quantity : 0), 0);
+  const hasUnpricedItems = unpricedItemCount > 0;
 
   // Generate WhatsApp Message
   const generateMessage = (action: 'inquiry' | 'video') => {
@@ -87,14 +100,22 @@ const CartPage: React.FC = () => {
         message += `${index + 1}. *${item.name}*\n`;
         message += `   Code: ${item.id}\n`;
         message += `   Qty: ${item.quantity}\n`;
-        message += `   Price: ₹${item.price.toLocaleString('en-IN')}\n`;
+        if (isPricedItem(item)) {
+          message += `   Price: ₹${item.price.toLocaleString('en-IN')}\n`;
+        } else {
+          message += '   Price: On request\n';
+        }
         if(item.weight) message += `   Weight: ${item.weight}\n`;
         if(item.purity) message += `   Purity: ${item.purity}\n`;
         message += `   Link: ${itemUrl}\n\n`;
     });
 
-    const totalVal = targetItems.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
-    message += `Total Selected Value: ₹${totalVal.toLocaleString('en-IN')}\n\n`;
+      const totalVal = targetItems.reduce((acc, curr) => acc + (isPricedItem(curr) ? (curr.price * curr.quantity) : 0), 0);
+      if (totalVal > 0) {
+        message += `Total Selected Value (priced items): ₹${totalVal.toLocaleString('en-IN')}\n\n`;
+      } else {
+        message += 'Total Selected Value: Price on request\n\n';
+      }
     
     if (action === 'video') {
         message += "Please let me know when we can connect for a live viewing.";
@@ -157,7 +178,7 @@ const CartPage: React.FC = () => {
                             {/* Price Block */}
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <p className="font-bold text-lg">₹{item.price.toLocaleString('en-IN')}</p>
+                                    <p className="font-bold text-lg">{getItemPriceLabel(item)}</p>
                                     {item.originalPrice && <p className="text-xs text-gray-400 line-through">₹{item.originalPrice.toLocaleString('en-IN')}</p>}
                                 </div>
                                 <p className="text-[10px] text-green-700 font-bold flex items-center gap-1">
@@ -251,8 +272,8 @@ const CartPage: React.FC = () => {
                   <h3 className="font-bold text-lg mb-4 text-gray-800">Order Summary</h3>
                   <div className="space-y-3 mb-6 text-sm">
                     <div className="flex justify-between text-gray-600">
-                        <span>Subtotal ({cartCount} items)</span>
-                        <span className="font-bold text-gray-900">₹{cartTotal.toLocaleString('en-IN')}</span>
+                        <span>Subtotal (priced items{pricedItemCount > 0 ? `: ${pricedItemCount}` : ''})</span>
+                        <span className="font-bold text-gray-900">{pricedItemCount > 0 ? `₹${cartTotal.toLocaleString('en-IN')}` : 'Price on request'}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
                         <span>Discount</span>
@@ -267,10 +288,15 @@ const CartPage: React.FC = () => {
                   <div className="border-t border-dashed border-gray-200 pt-4 mb-6">
                     <div className="flex justify-between text-xl font-bold text-brand-black">
                         <span>Total</span>
-                        <span>₹{cartTotal.toLocaleString('en-IN')}</span>
+                        <span>{pricedItemCount > 0 ? `₹${cartTotal.toLocaleString('en-IN')}` : 'Price on request'}</span>
                     </div>
                     <p className="text-[10px] text-gray-400 mt-1 text-right">(Inclusive of all taxes)</p>
                   </div>
+                  {hasUnpricedItems && (
+                    <p className="text-[11px] text-gray-500 -mt-2">
+                      {unpricedItemCount} item{unpricedItemCount > 1 ? 's' : ''} priced on request. Final value will be confirmed on WhatsApp.
+                    </p>
+                  )}
 
                   <button 
                     onClick={handleProceedToCheckout}
@@ -278,6 +304,9 @@ const CartPage: React.FC = () => {
                   >
                     Proceed to Checkout <ArrowRight size={18} />
                   </button>
+                  <p className="text-[11px] text-gray-500 mt-2">
+                    Online ordering is coming soon. Next step shows inquiry options.
+                  </p>
 
                   <button 
                     onClick={() => navigate('/collections')}
@@ -290,11 +319,6 @@ const CartPage: React.FC = () => {
         </div>
       </div>
 
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
-        onSuccess={handleLoginSuccess}
-      />
     </div>
   );
 };

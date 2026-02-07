@@ -19,7 +19,7 @@ export const SHOP_INFO: ShopInfo = {
   address: "Zojwala Commercial Centre, KE, Mohammad Ali Chowk, Opposite Hotel Vrindavan Residency, Kalyan West, Maharashtra 421301",
   since: "1973",
   instagram: "https://www.instagram.com/sanghavi_gold/",
-  facebook: "https://www.facebook.com/profile.php?id=100079120424520&locale=nl_NL",
+  facebook: "https://www.facebook.com/people/Sanghavi-Gold/100079120424520/?locale=nl_NL",
   youtube: "https://www.youtube.com/@SanghaviGold/videos"
 };
 
