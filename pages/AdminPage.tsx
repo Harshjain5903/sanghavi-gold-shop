@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { storage } from '../lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
 
@@ -366,6 +366,23 @@ const AdminPage: React.FC = () => {
     }
   };
 
+    const uploadWithTimeout = (task: ReturnType<typeof uploadBytesResumable>, timeoutMs: number) => {
+        return new Promise<ReturnType<typeof uploadBytesResumable>['snapshot']>((resolve, reject) => {
+            const timer = setTimeout(() => {
+                task.cancel();
+                reject(new Error('Upload timed out. Please try again on a stronger network.'));
+            }, timeoutMs);
+
+            task.on('state_changed', undefined, (error) => {
+                clearTimeout(timer);
+                reject(error);
+            }, () => {
+                clearTimeout(timer);
+                resolve(task.snapshot);
+            });
+        });
+    };
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'product' | 'category', catIndex?: number) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -373,6 +390,7 @@ const AdminPage: React.FC = () => {
         try {
             const maxBytes = 100 * 1024 * 1024; // 100MB per image
             const maxImages = 50;
+            const timeoutMs = 120000;
             const skipped: string[] = [];
 
             if (target === 'product') {
@@ -380,17 +398,24 @@ const AdminPage: React.FC = () => {
                 const existingImages = formData.images || (formData.image ? [formData.image] : []);
                 const remainingSlots = Math.max(0, maxImages - existingImages.length);
 
-                for (let i = 0; i < files.length && newImageUrls.length < remainingSlots; i++) {
-                    const file = files[i];
+                const uploadTargets = Array.from(files).slice(0, remainingSlots).map((file) => {
                     if (file.size > maxBytes) {
                         skipped.push(`${file.name} (over 100MB)`);
-                        continue;
+                        return Promise.reject(new Error('File too large'));
                     }
                     const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-                    const snapshot = await uploadBytes(storageRef, file, { contentType: file.type || 'image/jpeg' });
-                    const downloadURL = await getDownloadURL(snapshot.ref);
-                    newImageUrls.push(downloadURL);
-                }
+                    const task = uploadBytesResumable(storageRef, file, { contentType: file.type || 'image/jpeg' });
+                    return uploadWithTimeout(task, timeoutMs).then(snapshot => getDownloadURL(snapshot.ref));
+                });
+
+                const results = await Promise.allSettled(uploadTargets);
+                results.forEach((result, index) => {
+                    if (result.status === 'fulfilled') {
+                        newImageUrls.push(result.value);
+                    } else if (!skipped.includes(files[index]?.name || '')) {
+                        skipped.push(`${files[index]?.name || 'image'} (upload failed)`);
+                    }
+                });
 
                 if (newImageUrls.length === 0) {
                     const reason = skipped.length > 0 ? `Skipped: ${skipped.join(', ')}` : 'No valid files selected.';
@@ -414,7 +439,8 @@ const AdminPage: React.FC = () => {
                     return;
                 }
                 const storageRef = ref(storage, `categories/${Date.now()}_${file.name}`);
-                const snapshot = await uploadBytes(storageRef, file, { contentType: file.type || 'image/jpeg' });
+                const task = uploadBytesResumable(storageRef, file, { contentType: file.type || 'image/jpeg' });
+                const snapshot = await uploadWithTimeout(task, timeoutMs);
                 const downloadURL = await getDownloadURL(snapshot.ref);
                 const updatedCats = [...localCategories];
                 updatedCats[catIndex] = { ...updatedCats[catIndex], image: downloadURL };
@@ -440,23 +466,31 @@ const AdminPage: React.FC = () => {
         try {
             const maxBytes = 500 * 1024 * 1024; // 500MB per video
             const maxVideos = 10;
+            const timeoutMs = 180000;
             const skipped: string[] = [];
 
             const newVideoUrls: string[] = [];
             const existingVideos = formData.videos || [];
             const remainingSlots = Math.max(0, maxVideos - existingVideos.length);
 
-            for (let i = 0; i < files.length && newVideoUrls.length < remainingSlots; i++) {
-                const file = files[i];
+            const uploadTargets = Array.from(files).slice(0, remainingSlots).map((file) => {
                 if (file.size > maxBytes) {
                     skipped.push(`${file.name} (over 500MB)`);
-                    continue;
+                    return Promise.reject(new Error('File too large'));
                 }
                 const storageRef = ref(storage, `products/videos/${Date.now()}_${file.name}`);
-                const snapshot = await uploadBytes(storageRef, file, { contentType: file.type || 'video/mp4' });
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                newVideoUrls.push(downloadURL);
-            }
+                const task = uploadBytesResumable(storageRef, file, { contentType: file.type || 'video/mp4' });
+                return uploadWithTimeout(task, timeoutMs).then(snapshot => getDownloadURL(snapshot.ref));
+            });
+
+            const results = await Promise.allSettled(uploadTargets);
+            results.forEach((result, index) => {
+                if (result.status === 'fulfilled') {
+                    newVideoUrls.push(result.value);
+                } else if (!skipped.includes(files[index]?.name || '')) {
+                    skipped.push(`${files[index]?.name || 'video'} (upload failed)`);
+                }
+            });
 
             if (newVideoUrls.length === 0) {
                 const reason = skipped.length > 0 ? `Skipped: ${skipped.join(', ')}` : 'No valid files selected.';
