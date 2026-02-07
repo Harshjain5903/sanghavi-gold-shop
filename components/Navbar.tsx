@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Menu, X, Search, User, MapPin, Phone, ChevronRight, ChevronLeft, ArrowUpRight, ShoppingBag } from 'lucide-react';
+import { Menu, X, Search, User, ChevronRight, ChevronLeft, ArrowUpRight, ShoppingBag } from 'lucide-react';
 import { SHOP_INFO } from '../constants';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
@@ -165,12 +165,9 @@ const Navbar: React.FC = () => {
     setIsOpen(false); // Close mobile menu if open
   };
 
-  const openVideoCall = () => {
-      window.open(`https://wa.me/${SHOP_INFO.whatsapp}?text=I want to book a video consultation.`, '_blank');
-  };
-
     const hasRates = rates.gold22k > 0 || rates.gold24k > 0 || rates.gold18k > 0 || rates.silver > 0;
-    const formatRate = (value: number) => (value > 0 ? `INR ${value.toLocaleString('en-IN')}/g` : '--');
+    const formatPer10g = (value: number) => (value > 0 ? `INR ${(value * 10).toLocaleString('en-IN')}/10g` : '--');
+    const formatPerKg = (value: number) => (value > 0 ? `INR ${(value * 1000).toLocaleString('en-IN')}/kg` : '--');
     const updatedText = rates.updatedAt
         ? new Date(rates.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
         : '';
@@ -180,25 +177,24 @@ const Navbar: React.FC = () => {
     <div className="sticky top-0 z-[100] bg-white font-sans shadow-sm" onMouseLeave={() => setActiveMenu(null)}>
       
       {/* 1. TOP NOTIFICATION BANNER */}
-      <div className="bg-gradient-to-r from-gray-900 via-brand-black to-gray-900 text-white text-xs py-2 px-4 flex justify-between items-center relative z-50">
-         <div className="hidden sm:flex gap-4">
-            <span onClick={openVideoCall} className="opacity-90 hover:text-gold-400 cursor-pointer transition-colors">Video Consultation</span>
-            <span onClick={scrollToStore} className="opacity-90 hover:text-gold-400 cursor-pointer transition-colors">Store Locator</span>
-         </div>
-                 <div className="flex-1 text-center flex flex-col items-center gap-1">
-                        <span className="font-bold tracking-wide cursor-pointer" onClick={scrollToStore}>Visit our Kalyan West Store for Exclusive Designs</span>
-                        {hasRates && (
-                            <span className="text-[10px] sm:text-xs text-gray-200/90 font-medium">
-                                Gold 22K: {formatRate(rates.gold22k)} | 24K: {formatRate(rates.gold24k)} | 18K: {formatRate(rates.gold18k)} | Silver: {formatRate(rates.silver)}
-                                {updatedText ? ` (${updatedText})` : ''}
-                            </span>
-                        )}
-                 </div>
-         <div className="hidden sm:flex gap-4">
-            <span onClick={scrollToStore} className="flex items-center gap-1 cursor-pointer hover:text-gold-400 transition-colors"><MapPin size={12}/> Locate Store</span>
-            <a href={`tel:${SHOP_INFO.phone}`} className="flex items-center gap-1 cursor-pointer hover:text-gold-400 transition-colors"><Phone size={12}/> Help</a>
-         </div>
-      </div>
+        <div className="bg-gradient-to-r from-gray-900 via-brand-black to-gray-900 text-white text-xs py-2 px-4 flex justify-center items-center relative z-50">
+            <div className="flex-1 text-center flex flex-col items-center gap-1">
+                <span className="font-bold tracking-wide cursor-pointer" onClick={scrollToStore}>Visit our store</span>
+                {hasRates && (
+                  <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] sm:text-xs font-semibold text-gray-100">
+                     <span className="inline-flex items-center gap-1 text-emerald-300">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        LIVE RATES
+                     </span>
+                     <span>Gold 24K: {formatPer10g(rates.gold24k)}</span>
+                     <span>Gold 22K: {formatPer10g(rates.gold22k)}</span>
+                     <span>Gold 18K: {formatPer10g(rates.gold18k)}</span>
+                     <span>Silver: {formatPerKg(rates.silver)}</span>
+                     {updatedText && <span className="text-gray-300">({updatedText})</span>}
+                  </div>
+                )}
+            </div>
+        </div>
 
       {/* 2. MAIN HEADER (Logo, Icons) */}
       <div className="bg-white relative z-40">
