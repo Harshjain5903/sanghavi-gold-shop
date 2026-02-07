@@ -25,7 +25,7 @@ const Navbar: React.FC = () => {
   const { cartCount } = useCart();
   const { isAuthenticated } = useAuth();
     const { rates } = useRates();
-    const [goldPurity, setGoldPurity] = useState<'gold24k' | 'gold22k' | 'gold18k'>('gold24k');
+    const [goldPurity, setGoldPurity] = useState<'gold24k' | 'gold22k' | 'gold18k'>('gold22k');
   
   // Mobile Menu State
   const [mobileSubMenu, setMobileSubMenu] = useState<string | null>(null);
@@ -171,7 +171,7 @@ const Navbar: React.FC = () => {
         if (!value || value <= 0) return '--';
         const multiplier = unit === '10g' ? 10 : unit === '100g' ? 100 : unit === '1kg' ? 1000 : 1;
         const label = unit === '1kg' ? 'kg' : unit;
-        return `INR ${(value * multiplier).toLocaleString('en-IN')}/${label}`;
+        return `₹${(value * multiplier).toLocaleString('en-IN')}/${label}`;
     };
 
   return (
@@ -183,7 +183,7 @@ const Navbar: React.FC = () => {
             <div className="flex-1 text-center flex flex-col items-center gap-1">
                 <span className="font-bold tracking-wide cursor-pointer" onClick={scrollToStore}>Visit our store</span>
                         {hasRates && (
-                            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] sm:text-xs font-semibold text-gray-100">
+                              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:text-sm font-semibold text-gray-100">
                                 <span className="inline-flex items-center gap-1 text-emerald-300">
                                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                                     LIVE RATES
