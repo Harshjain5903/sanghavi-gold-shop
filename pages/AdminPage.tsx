@@ -204,6 +204,80 @@ const AdminPage: React.FC = () => {
 
   const [formData, setFormData] = useState<Product>(initialFormState);
 
+    const normalizeText = (value: string) => value
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const singularize = (word: string) => word.replace(/s$/, '');
+
+    const allSubcategoryItems = React.useMemo(() => (
+        localCategories.flatMap(c => c.sections).flatMap(section => section.items)
+    ), [localCategories]);
+
+    const detectCategories = (product: Product) => {
+        const text = normalizeText(`${product.name} ${product.description}`);
+        const current = new Set((product.category || []).filter(Boolean));
+        const availableCategories = new Set(localCategories.map(c => c.category));
+
+        const addIfAvailable = (value: string) => {
+            if (availableCategories.has(value)) current.add(value);
+        };
+
+        if (/\bsilver\b/.test(text)) {
+            addIfAvailable('Silver');
+            const mensSilverCat = localCategories.find(c => {
+                const label = normalizeText(c.category);
+                return label.includes('silver') && (label.includes('men') || label.includes('mens') || label.includes('men s'));
+            });
+            if (mensSilverCat) current.add(mensSilverCat.category);
+        }
+        if (/\bgold\b/.test(text)) addIfAvailable('Gold');
+        if (/\bdiamond\b/.test(text)) addIfAvailable('Diamond');
+        if (/\bkada\b|\bkadas\b|\bbangle\b|\bbracelet\b/.test(text)) {
+            addIfAvailable('Bracelets & Bangles');
+        }
+
+        return Array.from(current);
+    };
+
+    const detectSubcategory = (product: Product) => {
+        const text = normalizeText(`${product.name} ${product.description}`);
+        const tokens = new Set(text.split(' ').filter(t => t.length > 2).map(singularize));
+
+        if (/\bkada\b|\bkadas\b|\bbangle\b|\bbracelet\b/.test(text)) {
+            if (/\bsilver\b/.test(text)) return 'Silver Kada';
+            return 'Kada';
+        }
+        if (/\bchoker\b|\bchokers\b|\bnecklace\b|\bpendant\b/.test(text)) return 'Necklaces';
+        if (/\bring\b|\brings\b|\bsolitaire\b/.test(text)) return 'Rings';
+        if (/\bearring\b|\bjhumka\b|\bstud\b|\bhoop\b/.test(text)) return 'Earrings';
+
+        let best: { label: string; score: number } | null = null;
+
+        allSubcategoryItems.forEach(label => {
+            const labelNorm = normalizeText(label);
+            const labelTokens = labelNorm.split(' ').filter(t => t.length > 2).map(singularize);
+            if (labelTokens.length === 0) return;
+
+            let score = 0;
+            labelTokens.forEach(token => {
+                if (tokens.has(token)) score += 12;
+            });
+
+            if (labelTokens.every(t => tokens.has(t))) score += 40;
+            if (labelNorm.includes('silver') && tokens.has('silver')) score += 15;
+            if (labelNorm.includes('kada') && tokens.has('kada')) score += 20;
+
+            if (!best || score > best.score) {
+                best = { label, score };
+            }
+        });
+
+        return best && best.score >= 30 ? best.label : '';
+    };
+
   // --- HELPER: GET ACTIVE CATEGORY CONFIG ---
   const activeCategoryConfig = React.useMemo(() => {
     if (!formData.category || formData.category.length === 0) return null;
@@ -339,36 +413,13 @@ const AdminPage: React.FC = () => {
       }
 
       // 2. SMART CATEGORIZATION ENGINE (Amazon-style Auto Tagging)
-      const lowerName = finalData.name.toLowerCase();
-      const lowerDesc = finalData.description.toLowerCase();
-      const currentCats = new Set(finalData.category);
+      finalData.category = detectCategories(finalData);
 
-      // Rule: Silver
-      if (lowerName.includes('silver') || lowerDesc.includes('silver')) {
-          currentCats.add('Silver');
-          // Also try to find exact matches for "Men's Silver" if it exists in localCategories
-          const mensSilverCat = localCategories.find(c => c.category.toLowerCase().includes("men's silver"));
-          if (mensSilverCat) {
-              currentCats.add(mensSilverCat.category);
-          }
-      }
-      // Rule: Gold
-      if (lowerName.includes('gold') || lowerDesc.includes('gold')) {
-          currentCats.add('Gold'); 
-      }
-      // Rule: Diamond
-      if (lowerName.includes('diamond') || lowerDesc.includes('diamond')) {
-          currentCats.add('Diamond');
-      }
-      // Rule: Kada -> Bangle/Bracelet
-      if (lowerName.includes('kada') || lowerDesc.includes('kada')) {
-          // Add closest matching existing category
-          if (localCategories.some(c => c.category === 'Bracelets & Bangles')) {
-              currentCats.add('Bracelets & Bangles');
-          }
-      }
-
-      finalData.category = Array.from(currentCats);
+            // 2b. SMART SUBCATEGORY NORMALIZATION (Free AI-like matching)
+            const detectedSub = detectSubcategory(finalData);
+            if (detectedSub && !finalData.subcategory?.trim()) {
+                finalData.subcategory = detectedSub;
+            }
 
       // 3. Image Handling
       if (!finalData.images || finalData.images.length === 0) {
@@ -518,6 +569,77 @@ const AdminPage: React.FC = () => {
                           product.subcategory?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+    const autoTagMissingSubcategories = async () => {
+        const candidates = products.filter(p => !p.subcategory || !p.subcategory.trim());
+        if (candidates.length === 0) {
+            alert('All products already have subcategories.');
+            return;
+        }
+
+        if (!window.confirm(`Auto-tag ${candidates.length} products with missing subcategories?`)) {
+            return;
+        }
+
+        let updatedCount = 0;
+        for (const product of candidates) {
+            const detected = detectSubcategory(product);
+            if (!detected) continue;
+            await updateProduct({ ...product, subcategory: detected });
+            updatedCount += 1;
+        }
+
+        alert(`Auto-tagged ${updatedCount} products.`);
+    };
+
+    const smartSyncAllTags = async () => {
+        let updatedCount = 0;
+        for (const product of products) {
+            const nextCategories = detectCategories(product);
+            const detectedSub = product.subcategory?.trim() ? product.subcategory : detectSubcategory(product);
+
+            const categoriesChanged =
+                nextCategories.length !== (product.category || []).length ||
+                nextCategories.some(cat => !(product.category || []).includes(cat));
+            const subcategoryChanged = !!detectedSub && detectedSub !== product.subcategory;
+
+            if (categoriesChanged || subcategoryChanged) {
+                await updateProduct({
+                    ...product,
+                    category: categoriesChanged ? nextCategories : product.category,
+                    subcategory: subcategoryChanged ? detectedSub : product.subcategory
+                });
+                updatedCount += 1;
+            }
+        }
+
+        alert(`Smart sync complete. Updated ${updatedCount} products.`);
+    };
+
+    const applySuggestedTags = async (product: Product) => {
+        const nextCategories = detectCategories(product);
+        const detectedSub = product.subcategory?.trim() ? product.subcategory : detectSubcategory(product);
+
+        const categoriesChanged =
+            nextCategories.length !== (product.category || []).length ||
+            nextCategories.some(cat => !(product.category || []).includes(cat));
+        const subcategoryChanged = !!detectedSub && detectedSub !== product.subcategory;
+
+        if (!categoriesChanged && !subcategoryChanged) {
+            alert('No new tags found for this product.');
+            return;
+        }
+
+        await updateProduct({
+            ...product,
+            category: categoriesChanged ? nextCategories : product.category,
+            subcategory: subcategoryChanged ? detectedSub : product.subcategory
+        });
+
+        const categoryLabel = categoriesChanged ? nextCategories.join(', ') : (product.category || []).join(', ');
+        const subLabel = subcategoryChanged ? detectedSub : (product.subcategory || '');
+        alert(`Tags updated.\nCategory: ${categoryLabel || 'None'}\nSubcategory: ${subLabel || 'None'}`);
+    };
 
   const trendingProducts = products.filter(p => p.isTrending);
   const collectionProducts = products.filter(p => p.isFeaturedCollection);
@@ -1025,7 +1147,15 @@ const AdminPage: React.FC = () => {
                         </button>
                         <h2 className="text-2xl font-bold text-gray-900">Products</h2>
                     </div>
-                    <button onClick={() => { setFormData(initialFormState); setActiveTab('add'); }} className="w-full md:w-auto bg-brand-black text-white px-4 py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-gold-600 transition shadow-md"><Plus size={16} /> Add Product</button>
+                                        <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
+                                                <button onClick={smartSyncAllTags} className="w-full md:w-auto border border-brand-black text-brand-black px-4 py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-brand-black hover:text-white transition">
+                                                    <Sparkles size={16} /> Smart Sync All
+                                                </button>
+                                                <button onClick={autoTagMissingSubcategories} className="w-full md:w-auto border border-gray-300 text-gray-800 px-4 py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:border-gold-500 hover:text-gold-700 hover:bg-gold-50 transition">
+                                                    Auto-Tag Missing
+                                                </button>
+                                                <button onClick={() => { setFormData(initialFormState); setActiveTab('add'); }} className="w-full md:w-auto bg-brand-black text-white px-4 py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-gold-600 transition shadow-md"><Plus size={16} /> Add Product</button>
+                                        </div>
                 </div>
                 
                 <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex flex-col sm:flex-row gap-4">
@@ -1065,7 +1195,19 @@ const AdminPage: React.FC = () => {
                                                 {product.isTrending && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-pink-50 text-pink-700">Trending</span>}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-right"><div className="flex items-center justify-end gap-2"><button onClick={() => startEdit(product)} className="p-2 text-gray-400 hover:text-brand-black hover:bg-gray-200 rounded transition"><Edit2 size={16} /></button><button onClick={() => handleDeleteProduct(product.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"><Trash2 size={16} /></button></div></td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button onClick={() => applySuggestedTags(product)} className="p-2 text-gray-400 hover:text-gold-600 hover:bg-gold-50 rounded transition" title="Apply smart tags">
+                                                    <Sparkles size={16} />
+                                                </button>
+                                                <button onClick={() => startEdit(product)} className="p-2 text-gray-400 hover:text-brand-black hover:bg-gray-200 rounded transition">
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button onClick={() => handleDeleteProduct(product.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))
                             )}

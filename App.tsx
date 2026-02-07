@@ -358,9 +358,20 @@ const CollectionsPage = () => {
             }
             if (subcategoryParam) {
                 const decodedSubParam = decodeURIComponent(subcategoryParam).toLowerCase().trim();
-                result = result.filter(p => 
-                    p.subcategory?.toLowerCase().trim() === decodedSubParam
-                );
+                result = result.filter(p => {
+                    const pSub = (p.subcategory || '').toLowerCase().trim();
+                    const catMatch = p.category.some(c => {
+                        const productCat = c.toLowerCase().trim();
+                        return productCat.includes(decodedSubParam) || decodedSubParam.includes(productCat);
+                    });
+
+                    return (
+                        pSub === decodedSubParam ||
+                        (pSub && pSub.includes(decodedSubParam)) ||
+                        (decodedSubParam && decodedSubParam.includes(pSub)) ||
+                        catMatch
+                    );
+                });
             }
         }
 
@@ -370,9 +381,22 @@ const CollectionsPage = () => {
             if (options.length > 0) {
                  result = result.filter(p => {
                      return options.some(opt => 
-                        p.subcategory === opt || 
-                        p.category.includes(opt) ||
-                        (sectionTitle.includes("Price") ? true : false)
+                        (() => {
+                            const optNorm = opt.toLowerCase().trim();
+                            const pSub = (p.subcategory || '').toLowerCase().trim();
+                            const catMatch = p.category.some(c => {
+                                const productCat = c.toLowerCase().trim();
+                                return productCat.includes(optNorm) || optNorm.includes(productCat);
+                            });
+
+                            return (
+                                pSub === optNorm ||
+                                (pSub && pSub.includes(optNorm)) ||
+                                (optNorm && optNorm.includes(pSub)) ||
+                                catMatch ||
+                                (sectionTitle.toLowerCase().includes("price") ? true : false)
+                            );
+                        })()
                      );
                  });
             }
