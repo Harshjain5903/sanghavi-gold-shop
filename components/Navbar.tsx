@@ -8,14 +8,30 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import AuthModal from './AuthModal';
 
-// Custom SG Logo Component using the provided image
-export const SanghaviLogo = ({ className = "w-10 h-10" }: { className?: string }) => (
-  <img 
-    src="https://drive.google.com/thumbnail?id=1xCtlWC8c-XYbegfLKAMbirqZ7Pkjdewi&sz=s1000" 
-    alt="Sanghavi Gold Logo" 
-    className={`object-contain ${className}`}
-  />
-);
+// Custom SG Logo Component using the provided image (with fallback)
+export const SanghaviLogo = ({ className = "w-10 h-10" }: { className?: string }) => {
+    const [failed, setFailed] = useState(false);
+
+    if (failed) {
+        return (
+            <div
+                className={`rounded-full bg-brand-black text-gold-500 font-serif font-bold flex items-center justify-center ${className}`}
+                aria-label="Sanghavi Gold Logo"
+            >
+                S
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src="https://drive.google.com/thumbnail?id=1xCtlWC8c-XYbegfLKAMbirqZ7Pkjdewi&sz=s1000"
+            alt="Sanghavi Gold Logo"
+            className={`object-contain ${className}`}
+            onError={() => setFailed(true)}
+        />
+    );
+};
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
