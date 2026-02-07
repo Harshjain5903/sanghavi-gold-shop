@@ -81,7 +81,6 @@ const AdminPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [imageUploading, setImageUploading] = useState(false);
-    const [videoUploading, setVideoUploading] = useState(false);
   const [managerSearch, setManagerSearch] = useState('');
   const [dbStatus, setDbStatus] = useState<'connecting' | 'connected'>('connecting');
   
@@ -389,34 +388,41 @@ const AdminPage: React.FC = () => {
         if (!files || files.length === 0) return;
         setImageUploading(true);
         try {
-            const maxBytes = 100 * 1024 * 1024; // 100MB per image
-            const maxImages = 50;
+            const maxBytes = 50 * 1024 * 1024; // 50MB per image
+            const maxImages = 30;
             const timeoutMs = 120000;
             const skipped: string[] = [];
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
             if (target === 'product') {
                 const newImageUrls: string[] = [];
                 const existingImages = formData.images || (formData.image ? [formData.image] : []);
                 const remainingSlots = Math.max(0, maxImages - existingImages.length);
 
-                const uploadTargets = Array.from(files).slice(0, remainingSlots).map((file) => {
+                const uploadQueue = (Array.from(files) as File[]).slice(0, remainingSlots);
+
+                for (const file of uploadQueue) {
                     if (file.size > maxBytes) {
-                        skipped.push(`${file.name} (over 100MB)`);
-                        return Promise.reject(new Error('File too large'));
+                        skipped.push(`${file.name} (over 50MB)`);
+                        continue;
+                    }
+                    if (file.type && !allowedTypes.includes(file.type)) {
+                        skipped.push(`${file.name} (unsupported type)`);
+                        continue;
                     }
                     const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
                     const task = uploadBytesResumable(storageRef, file, { contentType: file.type || 'image/jpeg' });
-                    return uploadWithTimeout(task, timeoutMs).then(snapshot => getDownloadURL(snapshot.ref));
-                });
-
-                const results = await Promise.allSettled(uploadTargets);
-                results.forEach((result, index) => {
-                    if (result.status === 'fulfilled') {
-                        newImageUrls.push(result.value);
-                    } else if (!skipped.includes(files[index]?.name || '')) {
-                        skipped.push(`${files[index]?.name || 'image'} (upload failed)`);
+                    try {
+                        const snapshot = await uploadWithTimeout(task, timeoutMs);
+                        const downloadURL = await getDownloadURL(snapshot.ref);
+                        newImageUrls.push(downloadURL);
+                    } catch (error: any) {
+                        const reason = error?.code === 'storage/unauthorized'
+                            ? 'permission denied'
+                            : (error?.message || 'upload failed');
+                        skipped.push(`${file.name} (${reason})`);
                     }
-                });
+                }
 
                 if (newImageUrls.length === 0) {
                     const reason = skipped.length > 0 ? `Skipped: ${skipped.join(', ')}` : 'No valid files selected.';
@@ -436,7 +442,7 @@ const AdminPage: React.FC = () => {
             } else if (target === 'category' && catIndex !== undefined) {
                 const file = files[0];
                 if (file.size > maxBytes) {
-                    alert('⚠️ Upload Failed. Image is larger than 100MB.');
+                    alert('⚠️ Upload Failed. Image is larger than 50MB.');
                     return;
                 }
                 const storageRef = ref(storage, `categories/${Date.now()}_${file.name}`);
@@ -450,65 +456,12 @@ const AdminPage: React.FC = () => {
             }
         } catch (error: any) {
             console.error("Error uploading image:", error);
-            const message = error?.message || 'Unknown error';
+            const message = error?.code === 'storage/unauthorized'
+                ? 'Permission denied. Please check Firebase Storage rules.'
+                : (error?.message || 'Unknown error');
             alert(`⚠️ Upload Failed. ${message}`);
         } finally {
             setImageUploading(false);
-            if (e.target) {
-                e.target.value = '';
-            }
-        }
-    };
-
-    const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-        setVideoUploading(true);
-        try {
-            const maxBytes = 500 * 1024 * 1024; // 500MB per video
-            const maxVideos = 10;
-            const timeoutMs = 180000;
-            const skipped: string[] = [];
-
-            const newVideoUrls: string[] = [];
-            const existingVideos = formData.videos || [];
-            const remainingSlots = Math.max(0, maxVideos - existingVideos.length);
-
-            const uploadTargets = Array.from(files).slice(0, remainingSlots).map((file) => {
-                if (file.size > maxBytes) {
-                    skipped.push(`${file.name} (over 500MB)`);
-                    return Promise.reject(new Error('File too large'));
-                }
-                const storageRef = ref(storage, `products/videos/${Date.now()}_${file.name}`);
-                const task = uploadBytesResumable(storageRef, file, { contentType: file.type || 'video/mp4' });
-                return uploadWithTimeout(task, timeoutMs).then(snapshot => getDownloadURL(snapshot.ref));
-            });
-
-            const results = await Promise.allSettled(uploadTargets);
-            results.forEach((result, index) => {
-                if (result.status === 'fulfilled') {
-                    newVideoUrls.push(result.value);
-                } else if (!skipped.includes(files[index]?.name || '')) {
-                    skipped.push(`${files[index]?.name || 'video'} (upload failed)`);
-                }
-            });
-
-            if (newVideoUrls.length === 0) {
-                const reason = skipped.length > 0 ? `Skipped: ${skipped.join(', ')}` : 'No valid files selected.';
-                alert(`⚠️ Upload Failed. ${reason}`);
-                return;
-            }
-
-            setFormData(prev => ({
-                ...prev,
-                videos: [...(prev.videos || []), ...newVideoUrls]
-            }));
-        } catch (error: any) {
-            console.error('Error uploading video:', error);
-            const message = error?.message || 'Unknown error';
-            alert(`⚠️ Upload Failed. ${message}`);
-        } finally {
-            setVideoUploading(false);
             if (e.target) {
                 e.target.value = '';
             }
@@ -527,16 +480,6 @@ const AdminPage: React.FC = () => {
       });
   };
 
-  const removeProductVideo = (index: number) => {
-      setFormData(prev => {
-          const currentVideos = [...(prev.videos || [])];
-          currentVideos.splice(index, 1);
-          return {
-              ...prev,
-              videos: currentVideos
-          };
-      });
-  };
 
   const handleProductSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1836,7 +1779,7 @@ const AdminPage: React.FC = () => {
                             </div>
                         </div>
 
-                        <button type="submit" disabled={uploading} className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gold-600 transition shadow-lg flex items-center justify-center gap-2">
+                        <button type="submit" disabled={imageUploading} className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gold-600 transition shadow-lg flex items-center justify-center gap-2">
                             <Save size={20} /> {activeTab === 'add' ? 'Publish Product' : 'Update Product'}
                         </button>
                     </div>
