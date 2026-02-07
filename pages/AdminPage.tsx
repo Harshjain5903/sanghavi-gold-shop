@@ -478,11 +478,11 @@ const AdminPage: React.FC = () => {
           finalData.image = finalData.images[0];
       }
 
-      // 4. Specs Standardization
-      const weightSpec = finalData.specifications?.find(s => s.key.toLowerCase().includes('weight'));
-      const puritySpec = finalData.specifications?.find(s => s.key.toLowerCase() === 'purity');
-      if (weightSpec) finalData.weight = weightSpec.value;
-      if (puritySpec) finalData.purity = puritySpec.value;
+    // 4. Specs Standardization
+    const weightSpec = finalData.specifications?.find(s => s.key.toLowerCase().includes('weight'));
+    const puritySpec = finalData.specifications?.find(s => s.key.toLowerCase() === 'purity');
+    if (weightSpec && weightSpec.value?.trim()) finalData.weight = weightSpec.value;
+    if (puritySpec && puritySpec.value?.trim()) finalData.purity = puritySpec.value;
 
       if (activeTab === 'add') {
         await addProduct(finalData);
@@ -1754,51 +1754,11 @@ const AdminPage: React.FC = () => {
 
                         {/* Pricing - UPDATED FOR OPTIONALITY */}
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b pb-2">Pricing (Optional)</h3>
+                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b pb-2">Card Display</h3>
                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-900 mb-1">Selling Price (₹)</label>
-                                        <input 
-                                            type="number" 
-                                            className="w-full border border-gray-300 p-2.5 rounded-lg font-bold text-lg text-gray-900 placeholder-gray-300" 
-                                            value={formData.price === 0 ? '' : formData.price} 
-                                            onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
-                                            placeholder="Leave empty if none"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-900 mb-1">MRP / Compare Price (₹)</label>
-                                        <input 
-                                            type="number" 
-                                            className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 placeholder-gray-300" 
-                                            value={!formData.originalPrice ? '' : formData.originalPrice} 
-                                            onChange={e => setFormData({...formData, originalPrice: Number(e.target.value)})} 
-                                            placeholder="Optional"
-                                        />
-                                    </div>
-                                </div>
-                                
-                                {/* Hide Price Toggle - RENAMED FOR CLARITY */}
-                                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={formData.priceOnRequest} 
-                                        onChange={e => setFormData({...formData, priceOnRequest: e.target.checked})} 
-                                        className="w-5 h-5 accent-brand-black rounded" 
-                                    />
-                                    <div className="flex-1">
-                                        <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                                            <Type size={16} /> Display "Price on Request" Label?
-                                        </span>
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                            If checked, "Price on Request" will be shown. If unchecked and price is 0, nothing will be shown.
-                                        </p>
-                                    </div>
-                                </label>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-900 mb-1">Card Display</label>
+                                        <label className="block text-sm font-medium text-gray-900 mb-1">Display on Cards</label>
                                         <select
                                             value={formData.cardDisplayMode || 'price'}
                                             onChange={e => setFormData({ ...formData, cardDisplayMode: e.target.value as 'price' | 'weight' | 'none' })}
@@ -1808,7 +1768,7 @@ const AdminPage: React.FC = () => {
                                             <option value="weight">Show Weight</option>
                                             <option value="none">Show Nothing</option>
                                         </select>
-                                        <p className="text-xs text-gray-500 mt-1">Controls what appears on product cards before opening a product.</p>
+                                        <p className="text-xs text-gray-500 mt-1">Controls what appears on product cards and product details.</p>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-900 mb-1">Card Weight</label>
@@ -1821,6 +1781,48 @@ const AdminPage: React.FC = () => {
                                         />
                                         <p className="text-xs text-gray-500 mt-1">Used when "Show Weight" is selected.</p>
                                     </div>
+                                </div>
+
+                                <div className="border-t border-gray-200 pt-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-900 mb-1">Selling Price (₹)</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full border border-gray-300 p-2.5 rounded-lg font-bold text-lg text-gray-900 placeholder-gray-300" 
+                                                value={formData.price === 0 ? '' : formData.price} 
+                                                onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
+                                                placeholder="Leave empty if none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-900 mb-1">MRP / Compare Price (₹)</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 placeholder-gray-300" 
+                                                value={!formData.originalPrice ? '' : formData.originalPrice} 
+                                                onChange={e => setFormData({...formData, originalPrice: Number(e.target.value)})} 
+                                                placeholder="Optional"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition mt-4">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={formData.priceOnRequest} 
+                                            onChange={e => setFormData({...formData, priceOnRequest: e.target.checked})} 
+                                            className="w-5 h-5 accent-brand-black rounded" 
+                                        />
+                                        <div className="flex-1">
+                                            <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                                <Type size={16} /> Display "Price on Request" Label?
+                                            </span>
+                                            <p className="text-xs text-gray-500 mt-0.5">
+                                                If checked, "Price on Request" will be shown. If unchecked and price is 0, nothing will be shown.
+                                            </p>
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
                         </div>

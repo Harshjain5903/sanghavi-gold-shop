@@ -144,12 +144,21 @@ const Hero: React.FC = () => {
                     {currentSlide.name}
                 </h2>
                 
-                {/* Price & CTA Row */}
+                {/* Price/Weight & CTA Row */}
                 <div className="flex items-end justify-between mt-3 md:mt-4">
+                  {(currentSlide.cardDisplayMode || 'price') === 'price' ? (
                     <div className="flex flex-col">
-                        <span className="text-[10px] md:text-xs text-gray-300 uppercase tracking-wider font-medium mb-0.5">Starting At</span>
-                        <span className="text-xl md:text-3xl font-bold text-white tracking-wide">₹{currentSlide.price.toLocaleString('en-IN')}</span>
+                      <span className="text-[10px] md:text-xs text-gray-300 uppercase tracking-wider font-medium mb-0.5">Starting At</span>
+                      <span className="text-xl md:text-3xl font-bold text-white tracking-wide">₹{currentSlide.price.toLocaleString('en-IN')}</span>
                     </div>
+                  ) : (currentSlide.cardDisplayMode || 'price') === 'weight' && currentSlide.weight ? (
+                    <div className="flex flex-col">
+                      <span className="text-[10px] md:text-xs text-gray-300 uppercase tracking-wider font-medium mb-0.5">Weight</span>
+                      <span className="text-xl md:text-3xl font-bold text-white tracking-wide">{currentSlide.weight}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col"></div>
+                  )}
                     
                     <button className="flex items-center gap-2 bg-white text-black px-4 py-2 md:px-8 md:py-3 font-bold uppercase text-[10px] md:text-sm tracking-widest hover:bg-gold-500 hover:text-white transition rounded-full shadow-lg mb-1">
                         Details <ArrowRight size={12} />

@@ -99,10 +99,12 @@ const ProductDetailsPage: React.FC = () => {
 
   const isOutOfStock = product.inStock === false;
   
-  // Logic: Show price only if > 0 AND "Price on Request" toggle is OFF
+  const displayMode = product.cardDisplayMode || 'price';
   const isPriceOnRequest = product.priceOnRequest === true;
   const hasPrice = product.price && product.price > 0;
-  const showPrice = hasPrice && !isPriceOnRequest;
+  const showPrice = displayMode === 'price' && hasPrice && !isPriceOnRequest;
+  const showPriceOnRequest = displayMode === 'price' && isPriceOnRequest;
+  const showWeight = displayMode === 'weight' && product.weight && product.weight.trim().length > 0;
 
   return (
     <div className="bg-white min-h-screen pb-24 md:pb-16">
@@ -153,7 +155,7 @@ const ProductDetailsPage: React.FC = () => {
                 <span className="text-sm text-gray-500 underline cursor-pointer">21 Ratings & Reviews</span>
               </div>
 
-              {showPrice ? (
+                {showPrice ? (
                   <>
                     <div className="flex items-end gap-3 mb-2">
                         <span className="text-3xl font-bold text-brand-black">₹{product.price.toLocaleString('en-IN')}</span>
@@ -166,9 +168,14 @@ const ProductDetailsPage: React.FC = () => {
                     </div>
                     <p className="text-xs text-gray-500">Inclusive of all taxes</p>
                   </>
-              ) : isPriceOnRequest ? (
+                ) : showPriceOnRequest ? (
                   <div className="bg-gold-50 p-4 rounded-lg inline-block">
                       <span className="text-lg md:text-xl font-bold text-gold-700 uppercase tracking-widest">Price on Request</span>
+                  </div>
+                ) : showWeight ? (
+                  <div className="flex items-end gap-3 mb-2">
+                    <span className="text-3xl font-bold text-brand-black">{product.weight}</span>
+                    <span className="text-xs text-gray-500">Weight</span>
                   </div>
               ) : (
                   // Empty state - aligns consistently
