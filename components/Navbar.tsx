@@ -289,13 +289,16 @@ const Navbar: React.FC = () => {
           <div className="md:hidden pb-4">
               <form onSubmit={handleSearchForm} className="relative w-full">
                   <input 
-                      type="text" 
+                      type="search" 
                       placeholder="Search for Jewellery..." 
                       className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white text-gray-900 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors shadow-sm"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onFocus={() => { if(suggestions.length > 0) setShowSuggestions(true); }}
+                      onKeyDown={(e) => e.key === 'Enter' && submitSearch(searchQuery)}
+                      enterKeyHint="search"
                   />
+                  <button type="submit" className="sr-only">Search</button>
                   <Search className="absolute left-3 top-2.5 text-gold-600" size={18} />
                   
                   {/* Suggestions Dropdown Mobile */}

@@ -132,6 +132,7 @@ const CartPage: React.FC = () => {
 
              {items.map(item => {
                const isSelected = selectedIds.includes(item.id);
+               const meta = [item.weight, item.purity].filter(Boolean).join(' | ');
                return (
                 <div key={item.id} className={`bg-white p-4 rounded-xl shadow-sm flex gap-4 items-start md:items-center relative transition-all ${isSelected ? 'border-2 border-gold-400 bg-gold-50/10' : 'border border-transparent'}`}>
                     
@@ -148,7 +149,7 @@ const CartPage: React.FC = () => {
                         <div className="flex justify-between items-start">
                              <div>
                                 <h3 className="font-bold text-gray-900 text-base md:text-lg pr-4 leading-tight line-clamp-2">{item.name}</h3>
-                                <p className="text-xs text-gray-500 mb-2 mt-1">{item.weight} | {item.purity}</p>
+                                {meta && <p className="text-xs text-gray-500 mb-2 mt-1">{meta}</p>}
                              </div>
                         </div>
 
