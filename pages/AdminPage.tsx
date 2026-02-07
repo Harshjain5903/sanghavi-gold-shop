@@ -80,7 +80,8 @@ const AdminPage: React.FC = () => {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [uploading, setUploading] = useState(false);
+    const [imageUploading, setImageUploading] = useState(false);
+    const [videoUploading, setVideoUploading] = useState(false);
   const [managerSearch, setManagerSearch] = useState('');
   const [dbStatus, setDbStatus] = useState<'connecting' | 'connected'>('connecting');
   
@@ -386,7 +387,7 @@ const AdminPage: React.FC = () => {
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'product' | 'category', catIndex?: number) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        setUploading(true);
+        setImageUploading(true);
         try {
             const maxBytes = 100 * 1024 * 1024; // 100MB per image
             const maxImages = 50;
@@ -452,7 +453,7 @@ const AdminPage: React.FC = () => {
             const message = error?.message || 'Unknown error';
             alert(`⚠️ Upload Failed. ${message}`);
         } finally {
-            setUploading(false);
+            setImageUploading(false);
             if (e.target) {
                 e.target.value = '';
             }
@@ -462,7 +463,7 @@ const AdminPage: React.FC = () => {
     const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-        setUploading(true);
+        setVideoUploading(true);
         try {
             const maxBytes = 500 * 1024 * 1024; // 500MB per video
             const maxVideos = 10;
@@ -507,7 +508,7 @@ const AdminPage: React.FC = () => {
             const message = error?.message || 'Unknown error';
             alert(`⚠️ Upload Failed. ${message}`);
         } finally {
-            setUploading(false);
+            setVideoUploading(false);
             if (e.target) {
                 e.target.value = '';
             }
@@ -1660,9 +1661,9 @@ const AdminPage: React.FC = () => {
                             
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                                 {/* Upload Button */}
-                                <label className={`aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    <input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(e, 'product')} className="hidden" disabled={uploading} />
-                                        {uploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
+                                <label className={`aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${imageUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    <input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(e, 'product')} className="hidden" disabled={imageUploading} />
+                                        {imageUploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
                                         <span className="text-xs font-bold text-gray-500 mt-2">Upload</span>
                                     </label>
 
@@ -1701,9 +1702,9 @@ const AdminPage: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                <label className={`h-32 rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    <input type="file" accept="video/*" multiple onChange={handleVideoUpload} className="hidden" disabled={uploading} />
-                                    {uploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
+                                <label className={`h-32 rounded-lg border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50 transition flex flex-col items-center justify-center cursor-pointer ${videoUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    <input type="file" accept="video/*" multiple onChange={handleVideoUpload} className="hidden" disabled={videoUploading} />
+                                    {videoUploading ? <Loader className="animate-spin text-gold-600" /> : <UploadCloud className="text-gray-400" />}
                                     <span className="text-xs font-bold text-gray-500 mt-2">Upload Video</span>
                                 </label>
 
