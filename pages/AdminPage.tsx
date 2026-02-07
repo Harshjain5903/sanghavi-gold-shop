@@ -1646,20 +1646,38 @@ const AdminPage: React.FC = () => {
                             <tr className="text-xs text-gray-500 uppercase tracking-wider">
                                 <th className="px-6 py-4 font-bold">Product</th>
                                 <th className="px-6 py-4 font-bold hidden md:table-cell">Category</th>
-                                <th className="px-6 py-4 font-bold">Price</th>
+                                <th className="px-6 py-4 font-bold">Display</th>
+                                <th className="px-6 py-4 font-bold">Value</th>
                                 <th className="px-6 py-4 font-bold hidden md:table-cell">Status</th>
                                 <th className="px-6 py-4 font-bold text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {filteredProducts.length === 0 ? (
-                                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">No products found matching your filters.</td></tr>
+                                <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-500">No products found matching your filters.</td></tr>
                             ) : (
                                 filteredProducts.map(product => (
                                     <tr key={product.id} className="hover:bg-gray-50 transition">
                                         <td className="px-6 py-4"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded bg-gray-100 flex-shrink-0 overflow-hidden border border-gray-200"><img src={product.image} className="w-full h-full object-cover" /></div><div><p className="font-bold text-gray-900 text-sm line-clamp-1">{product.name}</p></div></div></td>
                                         <td className="px-6 py-4 text-sm text-gray-600 hidden md:table-cell"><span className="block font-medium">{product.category ? product.category[0] : ''}</span>{product.subcategory && <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{product.subcategory}</span>}</td>
-                                        <td className="px-6 py-4 text-sm font-medium">₹{product.price.toLocaleString('en-IN')}</td>
+                                        <td className="px-6 py-4 text-sm font-medium">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 uppercase">
+                                                {product.cardDisplayMode === 'weight' ? 'Weight' : product.cardDisplayMode === 'none' ? 'None' : 'Price'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm font-medium">
+                                            {product.cardDisplayMode === 'weight' ? (
+                                                product.weight?.trim() ? product.weight : '--'
+                                            ) : product.cardDisplayMode === 'none' ? (
+                                                '--'
+                                            ) : product.priceOnRequest ? (
+                                                'Price on Request'
+                                            ) : product.price && product.price > 0 ? (
+                                                `₹${product.price.toLocaleString('en-IN')}`
+                                            ) : (
+                                                '--'
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 hidden md:table-cell">
                                             <div className="flex gap-2">
                                                 {product.inStock ? <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-700">In Stock</span> : <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600">Sold Out</span>}

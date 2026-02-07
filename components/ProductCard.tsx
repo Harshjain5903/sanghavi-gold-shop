@@ -91,7 +91,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
              ) : showPriceOnRequest ? (
                  <span className="text-xs md:text-sm font-bold text-gold-600 uppercase tracking-wide">Price on Request</span>
              ) : showWeight ? (
-               <span className="text-xs md:text-sm font-bold text-gray-700">Weight: {product.weight}</span>
+               <div className="flex items-baseline gap-2">
+                    <span className="text-base md:text-lg font-bold text-gray-900 whitespace-nowrap">{product.weight}</span>
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase tracking-wide">Weight</span>
+               </div>
              ) : null}
         </div>
 
