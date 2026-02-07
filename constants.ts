@@ -1,6 +1,14 @@
 import { Category, Product, ShopInfo, NavItem } from './types';
 import { Truck, ShieldCheck, Phone, Zap } from 'lucide-react';
 
+export const DEFAULT_METAL_RATES = {
+  gold22k: 0,
+  gold24k: 0,
+  gold18k: 0,
+  silver: 0,
+  updatedAt: ''
+};
+
 export const SHOP_INFO: ShopInfo = {
   name: "Sanghavi Gold",
   phone: "+91 79776 00660",

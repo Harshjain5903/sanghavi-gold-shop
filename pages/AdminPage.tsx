@@ -3,8 +3,10 @@ import { useProducts } from '../context/ProductContext';
 import { useCategories } from '../context/CategoryContext';
 import { useSortOptions } from '../context/SortOptionsContext';
 import { useFilterOptions } from '../context/FilterOptionsContext';
-import { Product, NavItem, ProductSpecification } from '../types';
+import { useRates } from '../context/RatesContext';
+import { Product, NavItem, ProductSpecification, MetalRates } from '../types';
 import { MegaMenuSection } from '../types';
+import { DEFAULT_METAL_RATES } from '../constants';
 import { 
     Plus, Edit2, Trash2, Save, Loader, 
     LayoutDashboard, Package, LogOut, Search, ArrowUpDown,
@@ -68,6 +70,7 @@ const AdminPage: React.FC = () => {
   const { categories, saveCategories } = useCategories();
     const { sortOptions, saveSortOptions, resetToDefault: resetSortOptions } = useSortOptions();
     const { filterSections, saveFilterSections, resetToDefault: resetFilterOptions } = useFilterOptions();
+    const { rates, saveRates } = useRates();
   
     // --- ADMIN AUTH STATE ---
     const [adminEmail, setAdminEmail] = useState('');
@@ -77,7 +80,7 @@ const AdminPage: React.FC = () => {
     const [isAdmin, setIsAdmin] = useState(false);
   
   // --- MAIN APP STATE ---
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'add' | 'edit' | 'categories' | 'filters' | 'trending' | 'collections'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'add' | 'edit' | 'categories' | 'filters' | 'sort' | 'rates' | 'trending' | 'collections'>('dashboard');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -98,6 +101,14 @@ const AdminPage: React.FC = () => {
     const [newSortOption, setNewSortOption] = useState('');
     const [localFilterSections, setLocalFilterSections] = useState<MegaMenuSection[]>([]);
     const [newFilterSectionTitle, setNewFilterSectionTitle] = useState('');
+    const [localRates, setLocalRates] = useState({
+        gold22k: '',
+        gold24k: '',
+        gold18k: '',
+        silver: ''
+    });
+    const [ratesSaving, setRatesSaving] = useState(false);
+    const [ratesMessage, setRatesMessage] = useState('');
   
   // MODAL STATES
   const [modalType, setModalType] = useState<'none' | 'add-cat' | 'rename-cat' | 'add-section' | 'add-item' | 'delete-cat' | 'delete-section' | 'delete-item'>('none');
@@ -151,6 +162,19 @@ const AdminPage: React.FC = () => {
     useEffect(() => {
         setLocalFilterSections(filterSections);
     }, [filterSections]);
+
+    const syncRatesInputs = (nextRates: MetalRates) => {
+        setLocalRates({
+            gold22k: nextRates.gold22k ? String(nextRates.gold22k) : '',
+            gold24k: nextRates.gold24k ? String(nextRates.gold24k) : '',
+            gold18k: nextRates.gold18k ? String(nextRates.gold18k) : '',
+            silver: nextRates.silver ? String(nextRates.silver) : ''
+        });
+    };
+
+    useEffect(() => {
+        syncRatesInputs(rates || DEFAULT_METAL_RATES);
+    }, [rates]);
 
   // Database Connection Mock
   useEffect(() => {
@@ -680,6 +704,41 @@ const AdminPage: React.FC = () => {
       }
   };
 
+  const updateRateInput = (key: keyof typeof localRates, value: string) => {
+      setLocalRates(prev => ({ ...prev, [key]: value }));
+  };
+
+  const parseRateValue = (value: string) => {
+      const num = Number(value);
+      return Number.isFinite(num) && num > 0 ? num : 0;
+  };
+
+  const handleSaveRates = async () => {
+      setRatesMessage('');
+      setRatesSaving(true);
+      try {
+          const nextRates: MetalRates = {
+              gold22k: parseRateValue(localRates.gold22k),
+              gold24k: parseRateValue(localRates.gold24k),
+              gold18k: parseRateValue(localRates.gold18k),
+              silver: parseRateValue(localRates.silver),
+              updatedAt: new Date().toISOString()
+          };
+          await saveRates(nextRates);
+          setRatesMessage('Rates updated successfully.');
+      } catch (e) {
+          console.error(e);
+          setRatesMessage('Failed to update rates.');
+      } finally {
+          setRatesSaving(false);
+      }
+  };
+
+  const resetRatesInputs = () => {
+      syncRatesInputs(rates || DEFAULT_METAL_RATES);
+      setRatesMessage('');
+  };
+
   const filteredProducts = products.filter(product => {
     const safeCategories = product.category || [];
     const matchesCategory = selectedCategoryFilter === 'All' || safeCategories.includes(selectedCategoryFilter);
@@ -896,6 +955,13 @@ const AdminPage: React.FC = () => {
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'sort' ? 'bg-gold-50 text-gold-700' : 'text-gray-600 hover:bg-gray-50'}`}
             >
                 <ArrowUpDown size={18} /> Sort Options
+            </button>
+
+            <button 
+                onClick={() => setActiveTab('rates')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'rates' ? 'bg-gold-50 text-gold-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+                <RefreshCw size={18} /> Gold/Silver Rates
             </button>
 
             <button 
@@ -1413,6 +1479,92 @@ const AdminPage: React.FC = () => {
                              <Plus size={14} /> Add Option
                          </button>
                      </div>
+                 </div>
+             </div>
+        )}
+
+        {/* VIEW: METAL RATES */}
+        {activeTab === 'rates' && (
+             <div className="max-w-4xl mx-auto animate-fade-in-up pb-20">
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                     <div>
+                        <button onClick={() => setActiveTab('dashboard')} className="md:hidden flex items-center gap-1 text-gray-500 text-sm font-medium mb-4">
+                            <ChevronRight size={16} className="rotate-180"/> Back to Dashboard
+                        </button>
+                        <h2 className="text-2xl font-bold text-gray-900">Gold & Silver Rates</h2>
+                        <p className="text-gray-500 text-sm mt-1">Update today's per gram rates for 22K, 24K, 18K, and silver.</p>
+                     </div>
+                     <div className="flex gap-3 w-full md:w-auto">
+                        <button onClick={handleSaveRates} disabled={ratesSaving} className="flex-1 md:flex-none bg-brand-black text-white px-5 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-gold-600 transition shadow-lg text-sm disabled:opacity-60">
+                            <Save size={18} /> {ratesSaving ? 'Saving...' : 'Save Rates'}
+                        </button>
+                        <button onClick={resetRatesInputs} className="flex-1 md:flex-none border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-gray-50 transition text-sm">
+                            <RefreshCw size={18} /> Reset
+                        </button>
+                     </div>
+                 </div>
+
+                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div>
+                             <label className="block text-sm font-medium text-gray-900 mb-1">Gold 22K (INR per gram)</label>
+                             <input
+                                 type="number"
+                                 value={localRates.gold22k}
+                                 onChange={(e) => updateRateInput('gold22k', e.target.value)}
+                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                 placeholder="e.g. 6200"
+                                 min="0"
+                                 step="0.01"
+                             />
+                         </div>
+                         <div>
+                             <label className="block text-sm font-medium text-gray-900 mb-1">Gold 24K (INR per gram)</label>
+                             <input
+                                 type="number"
+                                 value={localRates.gold24k}
+                                 onChange={(e) => updateRateInput('gold24k', e.target.value)}
+                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                 placeholder="e.g. 6800"
+                                 min="0"
+                                 step="0.01"
+                             />
+                         </div>
+                         <div>
+                             <label className="block text-sm font-medium text-gray-900 mb-1">Gold 18K (INR per gram)</label>
+                             <input
+                                 type="number"
+                                 value={localRates.gold18k}
+                                 onChange={(e) => updateRateInput('gold18k', e.target.value)}
+                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                 placeholder="e.g. 5100"
+                                 min="0"
+                                 step="0.01"
+                             />
+                         </div>
+                         <div>
+                             <label className="block text-sm font-medium text-gray-900 mb-1">Silver (INR per gram)</label>
+                             <input
+                                 type="number"
+                                 value={localRates.silver}
+                                 onChange={(e) => updateRateInput('silver', e.target.value)}
+                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gold-500"
+                                 placeholder="e.g. 85"
+                                 min="0"
+                                 step="0.01"
+                             />
+                         </div>
+                     </div>
+
+                     <div className="mt-4 text-xs text-gray-500">
+                        Last updated: {rates.updatedAt ? new Date(rates.updatedAt).toLocaleString('en-IN') : 'Not set'}
+                     </div>
+
+                     {ratesMessage && (
+                        <div className={`mt-3 text-xs font-medium px-3 py-2 rounded-lg ${ratesMessage.toLowerCase().includes('failed') ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
+                            {ratesMessage}
+                        </div>
+                     )}
                  </div>
              </div>
         )}

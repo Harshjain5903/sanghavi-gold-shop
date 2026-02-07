@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 import { CategoryProvider } from './context/CategoryContext';
 import { SortOptionsProvider } from './context/SortOptionsContext';
 import { FilterOptionsProvider } from './context/FilterOptionsContext';
+import { RatesProvider } from './context/RatesContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -20,11 +21,13 @@ root.render(
       <CategoryProvider>
         <SortOptionsProvider>
           <FilterOptionsProvider>
-            <ProductProvider>
-                <CartProvider>
-                  <App />
-                </CartProvider>
-            </ProductProvider>
+            <RatesProvider>
+              <ProductProvider>
+                  <CartProvider>
+                    <App />
+                  </CartProvider>
+              </ProductProvider>
+            </RatesProvider>
           </FilterOptionsProvider>
         </SortOptionsProvider>
       </CategoryProvider>

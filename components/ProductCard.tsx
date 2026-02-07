@@ -40,9 +40,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   // Logic: Show price only if it exists (>0) AND "Price on Request" is NOT checked.
   // Logic: Show "Price on Request" only if "Price on Request" IS checked.
   // Logic: Else show nothing.
-  const isPriceOnRequest = product.priceOnRequest === true;
-  const hasPrice = product.price && product.price > 0;
-  const showPrice = hasPrice && !isPriceOnRequest;
+    const isPriceOnRequest = product.priceOnRequest === true;
+    const hasPrice = product.price && product.price > 0;
+    const showPrice = hasPrice && !isPriceOnRequest;
 
   return (
     <div 
@@ -90,9 +90,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                  </>
              ) : isPriceOnRequest ? (
                  <span className="text-xs md:text-sm font-bold text-gold-600 uppercase tracking-wide">Price on Request</span>
-             ) : (
-                 <span className="text-xs md:text-sm font-medium text-gray-400">Price not listed</span>
-             )}
+             ) : null}
         </div>
 
         {/* Product Title - Added break-words and line-clamp handling */}
@@ -102,36 +100,25 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* Actions - Add to Bag Focus */}
         <div className="mt-auto pt-2 flex gap-2">
-            {showPrice ? (
-                <button 
-                    className={`flex-1 py-2 bg-brand-black text-white text-[10px] md:text-xs font-bold rounded hover:bg-gold-600 transition uppercase flex items-center justify-center gap-1 ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-400 hover:bg-gray-400' : ''}`}
-                    onClick={handleAddToBag}
-                    disabled={isOutOfStock}
-                >
-                    {isOutOfStock ? 'Sold Out' : <><ShoppingBag size={12} className="md:w-3.5 md:h-3.5" /> Add to Bag</>}
-                </button>
-            ) : (
-                <button 
-                    onClick={handleQuickInquire}
-                    className="flex-1 py-2 border border-brand-black text-brand-black text-[10px] md:text-xs font-bold rounded hover:bg-brand-black hover:text-white transition uppercase flex items-center justify-center gap-1"
-                >
-                    {isPriceOnRequest ? 'Contact for Price' : 'Inquire'} <ArrowRight size={12} />
-                </button>
-            )}
+            <button 
+                className={`flex-1 py-2 bg-brand-black text-white text-[10px] md:text-xs font-bold rounded hover:bg-gold-600 transition uppercase flex items-center justify-center gap-1 ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-400 hover:bg-gray-400' : ''}`}
+                onClick={handleAddToBag}
+                disabled={isOutOfStock}
+            >
+                {isOutOfStock ? 'Sold Out' : <><ShoppingBag size={12} className="md:w-3.5 md:h-3.5" /> Add to Bag</>}
+            </button>
             
-            {showPrice && (
-                <button 
-                    onClick={handleQuickInquire}
-                    className="py-2 px-3 border border-gray-200 text-gray-500 rounded hover:border-brand-black hover:text-brand-black transition flex-shrink-0"
-                >
-                    <MessageCircle size={16} />
-                </button>
-            )}
+            <button 
+                onClick={handleQuickInquire}
+                className="py-2 px-3 border border-gray-200 text-gray-500 rounded hover:border-brand-black hover:text-brand-black transition flex-shrink-0"
+            >
+                <MessageCircle size={16} />
+            </button>
         </div>
       </div>
       
       {/* Ready to Ship Badge Bottom (Hidden on very small mobile to save space) */}
-      {!isOutOfStock && showPrice && (
+      {!isOutOfStock && (
           <div className="hidden sm:block px-4 pb-3">
               <span className="text-[10px] text-green-700 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span> In Store

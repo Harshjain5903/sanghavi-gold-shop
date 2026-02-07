@@ -66,3 +66,11 @@ export interface ShopInfo {
   facebook: string;
   youtube: string;
 }
+
+export interface MetalRates {
+  gold22k: number;
+  gold24k: number;
+  gold18k: number;
+  silver: number;
+  updatedAt?: string;
+}

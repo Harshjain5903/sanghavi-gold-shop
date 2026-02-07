@@ -6,6 +6,7 @@ import { useProducts } from '../context/ProductContext';
 import { useCategories } from '../context/CategoryContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useRates } from '../context/RatesContext';
 import AuthModal from './AuthModal';
 
 // Custom SG Logo Component using the provided image
@@ -23,6 +24,7 @@ const Navbar: React.FC = () => {
   const { categories } = useCategories(); 
   const { cartCount } = useCart();
   const { isAuthenticated } = useAuth();
+    const { rates } = useRates();
   
   // Mobile Menu State
   const [mobileSubMenu, setMobileSubMenu] = useState<string | null>(null);
@@ -167,6 +169,12 @@ const Navbar: React.FC = () => {
       window.open(`https://wa.me/${SHOP_INFO.whatsapp}?text=I want to book a video consultation.`, '_blank');
   };
 
+    const hasRates = rates.gold22k > 0 || rates.gold24k > 0 || rates.gold18k > 0 || rates.silver > 0;
+    const formatRate = (value: number) => (value > 0 ? `INR ${value.toLocaleString('en-IN')}/g` : '--');
+    const updatedText = rates.updatedAt
+        ? new Date(rates.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        : '';
+
   return (
     <>
     <div className="sticky top-0 z-[100] bg-white font-sans shadow-sm" onMouseLeave={() => setActiveMenu(null)}>
@@ -177,9 +185,15 @@ const Navbar: React.FC = () => {
             <span onClick={openVideoCall} className="opacity-90 hover:text-gold-400 cursor-pointer transition-colors">Video Consultation</span>
             <span onClick={scrollToStore} className="opacity-90 hover:text-gold-400 cursor-pointer transition-colors">Store Locator</span>
          </div>
-         <div className="flex-1 text-center">
-            <span className="font-bold tracking-wide cursor-pointer" onClick={scrollToStore}>Visit our Kalyan West Store for Exclusive Designs</span>
-         </div>
+                 <div className="flex-1 text-center flex flex-col items-center gap-1">
+                        <span className="font-bold tracking-wide cursor-pointer" onClick={scrollToStore}>Visit our Kalyan West Store for Exclusive Designs</span>
+                        {hasRates && (
+                            <span className="text-[10px] sm:text-xs text-gray-200/90 font-medium">
+                                Gold 22K: {formatRate(rates.gold22k)} | 24K: {formatRate(rates.gold24k)} | 18K: {formatRate(rates.gold18k)} | Silver: {formatRate(rates.silver)}
+                                {updatedText ? ` (${updatedText})` : ''}
+                            </span>
+                        )}
+                 </div>
          <div className="hidden sm:flex gap-4">
             <span onClick={scrollToStore} className="flex items-center gap-1 cursor-pointer hover:text-gold-400 transition-colors"><MapPin size={12}/> Locate Store</span>
             <a href={`tel:${SHOP_INFO.phone}`} className="flex items-center gap-1 cursor-pointer hover:text-gold-400 transition-colors"><Phone size={12}/> Help</a>
