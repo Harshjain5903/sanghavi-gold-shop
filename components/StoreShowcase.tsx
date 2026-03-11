@@ -14,7 +14,7 @@ const StoreShowcase: React.FC = () => {
   // State for reviews (Prepared for API integration)
   const [reviewData] = useState({
     rating: 5.0,
-    count: 173
+    count: 210
   });
 
   // Lightbox State
