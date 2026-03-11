@@ -157,6 +157,29 @@ const Navbar: React.FC = () => {
       }
   };
 
+    const handleMobileProfileClick = () => {
+        setIsOpen(false);
+        setMobileSubMenu(null);
+        if (isAuthenticated) {
+            navigate('/profile');
+            return;
+        }
+        setIsAuthOpen(true);
+    };
+
+    const handleMobileNavigate = (path: string) => {
+        setIsOpen(false);
+        setMobileSubMenu(null);
+        navigate(path);
+    };
+
+    const handleMobileLogout = async () => {
+        setIsOpen(false);
+        setMobileSubMenu(null);
+        await logout();
+        navigate('/');
+    };
+
   const handleLogout = async () => {
     await logout();
     setIsAccountMenuOpen(false);
@@ -514,7 +537,7 @@ const Navbar: React.FC = () => {
                     // LEVEL 1: Main Categories (Vertical List - Standard)
                     <div className="flex flex-col pb-20">
                         <div className="grid grid-cols-1 gap-2 p-4 border-b border-gray-100">
-                             <button onClick={() => { setIsOpen(false); handleProfileClick(); }} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg w-full">
+                             <button onClick={handleMobileProfileClick} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg w-full">
                                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-black shadow-sm">
                                      <User size={20}/>
                                  </div>
@@ -525,6 +548,29 @@ const Navbar: React.FC = () => {
                                                                      )}
                                                                  </div>
                              </button>
+
+                             {isAuthenticated && (
+                                 <div className="grid grid-cols-2 gap-2 mt-2">
+                                     <button
+                                         onClick={() => handleMobileNavigate('/wishlist')}
+                                         className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-lg w-full text-xs font-bold uppercase"
+                                     >
+                                         <Heart size={14} /> Wishlist
+                                     </button>
+                                     <button
+                                         onClick={() => handleMobileNavigate('/cart')}
+                                         className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-lg w-full text-xs font-bold uppercase"
+                                     >
+                                         <ShoppingBag size={14} /> My Bag
+                                     </button>
+                                     <button
+                                         onClick={handleMobileLogout}
+                                         className="col-span-2 flex items-center justify-center gap-2 p-3 bg-red-50 text-red-600 rounded-lg w-full text-xs font-bold uppercase"
+                                     >
+                                         <LogOut size={14} /> Logout
+                                     </button>
+                                 </div>
+                             )}
                              
                              <button onClick={scrollToStore} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg w-full mt-2">
                                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-black shadow-sm">
