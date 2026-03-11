@@ -167,12 +167,6 @@ const Navbar: React.FC = () => {
         setIsAuthOpen(true);
     };
 
-    const handleMobileNavigate = (path: string) => {
-        setIsOpen(false);
-        setMobileSubMenu(null);
-        navigate(path);
-    };
-
     const handleMobileLogout = async () => {
         setIsOpen(false);
         setMobileSubMenu(null);
@@ -543,34 +537,8 @@ const Navbar: React.FC = () => {
                                  </div>
                                                                  <div className="text-left">
                                                                      <span className="text-sm font-bold uppercase block">{isAuthenticated ? 'My Profile' : 'Login / Signup'}</span>
-                                                                     {isAuthenticated && (user?.email || user?.mobile) && (
-                                                                         <span className="text-[11px] text-gray-500 block mt-0.5">{user?.email || user?.mobile}</span>
-                                                                     )}
                                                                  </div>
                              </button>
-
-                             {isAuthenticated && (
-                                 <div className="grid grid-cols-2 gap-2 mt-2">
-                                     <button
-                                         onClick={() => handleMobileNavigate('/wishlist')}
-                                         className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-lg w-full text-xs font-bold uppercase"
-                                     >
-                                         <Heart size={14} /> Wishlist
-                                     </button>
-                                     <button
-                                         onClick={() => handleMobileNavigate('/cart')}
-                                         className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-lg w-full text-xs font-bold uppercase"
-                                     >
-                                         <ShoppingBag size={14} /> My Bag
-                                     </button>
-                                     <button
-                                         onClick={handleMobileLogout}
-                                         className="col-span-2 flex items-center justify-center gap-2 p-3 bg-red-50 text-red-600 rounded-lg w-full text-xs font-bold uppercase"
-                                     >
-                                         <LogOut size={14} /> Logout
-                                     </button>
-                                 </div>
-                             )}
                              
                              <button onClick={scrollToStore} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg w-full mt-2">
                                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-black shadow-sm">
@@ -609,6 +577,14 @@ const Navbar: React.FC = () => {
                             <div className="flex flex-col gap-2 text-sm text-gray-500">
                                 <span className="flex items-center gap-2"><Phone size={14}/> {SHOP_INFO.phone}</span>
                             </div>
+                            {isAuthenticated && (
+                                <button
+                                    onClick={handleMobileLogout}
+                                    className="w-full flex items-center justify-center gap-2 p-3 bg-red-50 text-red-600 rounded-lg text-xs font-bold uppercase"
+                                >
+                                    <LogOut size={14} /> Logout
+                                </button>
+                            )}
                         </div>
                     </div>
                 ) : (
