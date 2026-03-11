@@ -28,9 +28,6 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="text-sm font-bold mb-4 text-brand-black uppercase tracking-wider">Sanghavi Advantage</h4>
             <ul className="space-y-2 text-xs text-gray-600">
-              <li><Link to="/" className="hover:text-gold-600">15-DAY RETURNS</Link></li>
-              <li><Link to="/" className="hover:text-gold-600">FREE SHIPPING</Link></li>
-              <li><Link to="/" className="hover:text-gold-600">FINANCING OPTIONS</Link></li>
               <li><Link to="/" className="hover:text-gold-600">OLD GOLD EXCHANGE</Link></li>
               <li><Link to="/" className="hover:text-gold-600">VIDEO CONSULTATION</Link></li>
             </ul>
