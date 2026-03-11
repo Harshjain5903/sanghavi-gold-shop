@@ -207,7 +207,7 @@ const CheckoutPage: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Shipping</span>
-                <span className="text-green-600 font-bold">FREE</span>
+                <span className="font-bold">To be confirmed</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-3 mt-2">
                 <span>Total</span>
