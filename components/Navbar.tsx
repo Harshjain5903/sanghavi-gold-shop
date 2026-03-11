@@ -167,6 +167,12 @@ const Navbar: React.FC = () => {
         setIsAuthOpen(true);
     };
 
+    const handleMobileNavigate = (path: string) => {
+        setIsOpen(false);
+        setMobileSubMenu(null);
+        navigate(path);
+    };
+
     const handleMobileLogout = async () => {
         setIsOpen(false);
         setMobileSubMenu(null);
@@ -531,14 +537,28 @@ const Navbar: React.FC = () => {
                     // LEVEL 1: Main Categories (Vertical List - Standard)
                     <div className="flex flex-col pb-20">
                         <div className="grid grid-cols-1 gap-2 p-4 border-b border-gray-100">
-                             <button onClick={handleMobileProfileClick} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg w-full">
-                                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-black shadow-sm">
-                                     <User size={20}/>
-                                 </div>
-                                                                 <div className="text-left">
-                                                                     <span className="text-sm font-bold uppercase block">{isAuthenticated ? 'My Profile' : 'Login / Signup'}</span>
-                                                                 </div>
-                             </button>
+                             {isAuthenticated ? (
+                                 <button onClick={() => handleMobileNavigate('/profile')} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg w-full">
+                                     <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-black shadow-sm">
+                                         <User size={20} />
+                                     </div>
+                                     <div className="text-left">
+                                         <span className="text-sm font-bold uppercase block">My Profile</span>
+                                         {user?.email && (
+                                             <span className="text-[11px] text-gray-500 block mt-0.5">{user.email}</span>
+                                         )}
+                                     </div>
+                                 </button>
+                             ) : (
+                                 <button onClick={handleMobileProfileClick} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg w-full">
+                                     <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-black shadow-sm">
+                                         <User size={20} />
+                                     </div>
+                                     <div className="text-left">
+                                         <span className="text-sm font-bold uppercase block">Login / Signup</span>
+                                     </div>
+                                 </button>
+                             )}
                              
                              <button onClick={scrollToStore} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg w-full mt-2">
                                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-black shadow-sm">
