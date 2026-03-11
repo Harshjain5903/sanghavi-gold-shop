@@ -20,36 +20,75 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const USER_STORAGE_KEY = 'sanghavi_user';
+
+const getStoredUser = (): UserProfile | null => {
+  try {
+    const raw = localStorage.getItem(USER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as UserProfile;
+    return {
+      uid: parsed.uid,
+      name: parsed.name || 'User',
+      email: parsed.email || '',
+      mobile: parsed.mobile || '',
+      isGuest: false,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const saveStoredUser = (profile: UserProfile | null) => {
+  if (!profile) {
+    localStorage.removeItem(USER_STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile));
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(() => getStoredUser());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
+          const storedUser = getStoredUser();
+
           // Fetch extra profile details from Firestore
           const docRef = doc(db, 'users', firebaseUser.uid);
           const docSnap = await getDoc(docRef);
+
+          const fallbackProfile: UserProfile = {
+            uid: firebaseUser.uid,
+            name: firebaseUser.displayName || storedUser?.name || 'User',
+            email: firebaseUser.email || storedUser?.email || '',
+            mobile: firebaseUser.phoneNumber || storedUser?.mobile || '',
+            isGuest: false,
+          };
           
           if (docSnap.exists()) {
-             setUser({ ...docSnap.data() as UserProfile, uid: firebaseUser.uid, isGuest: false });
+             const profile = {
+               ...fallbackProfile,
+               ...(docSnap.data() as UserProfile),
+               uid: firebaseUser.uid,
+               isGuest: false,
+             };
+             setUser(profile);
+             saveStoredUser(profile);
           } else {
              // Fallback for users created without profile doc (shouldn't happen with our modal)
-             setUser({
-                 uid: firebaseUser.uid,
-                 name: firebaseUser.displayName || 'User',
-                 email: firebaseUser.email || '',
-                 mobile: '',
-                 isGuest: false
-             });
+             setUser(fallbackProfile);
+             saveStoredUser(fallbackProfile);
           }
         } catch (e) {
             console.error("Error fetching user profile", e);
         }
       } else {
         setUser(null);
+        saveStoredUser(null);
       }
       setLoading(false);
     });
@@ -62,7 +101,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
         const userRef = doc(db, 'users', auth.currentUser.uid);
         await setDoc(userRef, data, { merge: true });
-        setUser(prev => prev ? { ...prev, ...data } : null);
+        setUser(prev => {
+          if (!prev) return null;
+          const updated = { ...prev, ...data };
+          saveStoredUser(updated);
+          return updated;
+        });
     } catch (e) {
         console.error("Error updating profile", e);
         throw e;
@@ -72,7 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     await signOut(auth);
     setUser(null);
-    localStorage.removeItem('sanghavi_user');
+    saveStoredUser(null);
   };
 
   return (

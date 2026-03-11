@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product } from '../types';
+import { useAuth } from './AuthContext';
 
 interface WishlistContextType {
   wishlist: Product[];
@@ -10,26 +11,72 @@ interface WishlistContextType {
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
+const GUEST_WISHLIST_KEY = 'sanghavi_wishlist_guest';
+const LEGACY_WISHLIST_KEY = 'sanghavi_wishlist';
+
+const readWishlistFromStorage = (key: string): Product[] => {
+  const saved = localStorage.getItem(key);
+  if (!saved) return [];
+  try {
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const migrateLegacyGuestWishlist = () => {
+  const alreadyMigrated = localStorage.getItem(GUEST_WISHLIST_KEY);
+  if (alreadyMigrated) return;
+  const legacy = localStorage.getItem(LEGACY_WISHLIST_KEY);
+  if (!legacy) return;
+  localStorage.setItem(GUEST_WISHLIST_KEY, legacy);
+  localStorage.removeItem(LEGACY_WISHLIST_KEY);
+};
+
+const mergeWishlist = (base: Product[], incoming: Product[]): Product[] => {
+  const map = new Map<string, Product>();
+  base.forEach(item => map.set(item.id, item));
+  incoming.forEach(item => {
+    if (!map.has(item.id)) map.set(item.id, item);
+  });
+  return Array.from(map.values());
+};
 
 export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
   const [wishlist, setWishlist] = useState<Product[]>([]);
+  const [storageKey, setStorageKey] = useState<string | null>(null);
 
-  // Load from local storage on mount
+  // Load account-scoped wishlist. Migrate guest wishlist to user wishlist on first login.
   useEffect(() => {
-    const saved = localStorage.getItem('sanghavi_wishlist');
-    if (saved) {
-      try {
-        setWishlist(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load wishlist");
+    if (loading) return;
+
+    migrateLegacyGuestWishlist();
+
+    const nextKey = user?.uid ? `sanghavi_wishlist_${user.uid}` : GUEST_WISHLIST_KEY;
+    const scopedWishlist = readWishlistFromStorage(nextKey);
+
+    if (user?.uid) {
+      const guestWishlist = readWishlistFromStorage(GUEST_WISHLIST_KEY);
+      const merged = mergeWishlist(scopedWishlist, guestWishlist);
+      if (guestWishlist.length > 0) {
+        localStorage.removeItem(GUEST_WISHLIST_KEY);
       }
+      setWishlist(merged);
+      setStorageKey(nextKey);
+      return;
     }
-  }, []);
 
-  // Save to local storage on change
+    setWishlist(scopedWishlist);
+    setStorageKey(nextKey);
+  }, [user?.uid, loading]);
+
+  // Save wishlist to the active scope key.
   useEffect(() => {
-    localStorage.setItem('sanghavi_wishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
+    if (!storageKey) return;
+    localStorage.setItem(storageKey, JSON.stringify(wishlist));
+  }, [wishlist, storageKey]);
 
   const addToWishlist = (product: Product) => {
     setWishlist(prev => {

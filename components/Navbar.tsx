@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Menu, X, Search, User, MapPin, Phone, ChevronRight, ChevronLeft, ArrowUpRight, ShoppingBag } from 'lucide-react';
+import { Menu, X, Search, User, MapPin, Phone, ChevronRight, ChevronLeft, ArrowUpRight, ShoppingBag, Heart, LogOut } from 'lucide-react';
 import { SHOP_INFO } from '../constants';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
@@ -23,7 +23,7 @@ const Navbar: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { categories } = useCategories(); 
   const { cartCount } = useCart();
-  const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user, logout } = useAuth();
     const { rates } = useRates();
     const [goldPurity, setGoldPurity] = useState<'gold24k' | 'gold22k' | 'gold18k'>('gold22k');
   
@@ -37,11 +37,13 @@ const Navbar: React.FC = () => {
 
   // Auth Modal State
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+    const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
   const { products } = useProducts();
   const navigate = useNavigate();
   const location = useLocation();
   const searchContainerRef = useRef<HTMLDivElement>(null);
+    const accountMenuRef = useRef<HTMLDivElement>(null);
 
   // Build a smart, weighted list of search terms
   const searchCorpus = useMemo(() => {
@@ -113,6 +115,9 @@ const Navbar: React.FC = () => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
       }
+            if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+                setIsAccountMenuOpen(false);
+            }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -146,10 +151,16 @@ const Navbar: React.FC = () => {
 
   const handleProfileClick = () => {
       if (isAuthenticated) {
-          navigate('/profile');
+          setIsAccountMenuOpen(prev => !prev);
       } else {
           setIsAuthOpen(true);
       }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setIsAccountMenuOpen(false);
+    navigate('/');
   };
 
   // --- Store Locator Scroll Logic ---
@@ -293,14 +304,51 @@ const Navbar: React.FC = () => {
             </div>
 
             {/* Right Icons */}
-            <div className="flex items-center gap-4 md:gap-8">
-              <button 
-                onClick={handleProfileClick} 
-                className="hidden md:flex flex-col items-center cursor-pointer text-brand-black hover:text-gold-600 transition group"
-              >
-                <User size={22} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
-                <span className="text-[10px] font-bold mt-1 tracking-wide">{isAuthenticated ? 'ACCOUNT' : 'PROFILE'}</span>
-              </button>
+                        <div className="flex items-center gap-4 md:gap-8">
+                            <div className="hidden md:block relative" ref={accountMenuRef}>
+                                <button 
+                                    onClick={handleProfileClick} 
+                                    className="flex flex-col items-center cursor-pointer text-brand-black hover:text-gold-600 transition group"
+                                >
+                                    <User size={22} strokeWidth={1.5} className="group-hover:scale-110 transition-transform" />
+                                    <span className="text-[10px] font-bold mt-1 tracking-wide">{isAuthenticated ? 'ACCOUNT' : 'PROFILE'}</span>
+                                </button>
+
+                                {isAuthenticated && isAccountMenuOpen && (
+                                    <div className="absolute right-0 mt-3 w-72 bg-white border border-gray-100 shadow-2xl rounded-2xl overflow-hidden z-[120] animate-fade-in-up">
+                                        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Signed in as</p>
+                                            <p className="text-sm font-bold text-gray-900 line-clamp-1">{user?.name || 'Sanghavi Customer'}</p>
+                                            <p className="text-xs text-gray-600 line-clamp-1">{user?.email || user?.mobile || 'Account active'}</p>
+                                        </div>
+
+                                        <button
+                                            onClick={() => { setIsAccountMenuOpen(false); navigate('/profile'); }}
+                                            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                        >
+                                            <User size={16} /> My Account
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsAccountMenuOpen(false); navigate('/wishlist'); }}
+                                            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                        >
+                                            <Heart size={16} /> Wishlist
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsAccountMenuOpen(false); navigate('/cart'); }}
+                                            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                        >
+                                            <ShoppingBag size={16} /> My Bag
+                                        </button>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 border-t border-gray-100 flex items-center gap-2"
+                                        >
+                                            <LogOut size={16} /> Logout
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
               
               <Link to="/cart" className="flex flex-col items-center cursor-pointer text-brand-black hover:text-gold-600 transition group relative">
                  <div className="relative">
@@ -470,7 +518,12 @@ const Navbar: React.FC = () => {
                                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-black shadow-sm">
                                      <User size={20}/>
                                  </div>
-                                 <span className="text-sm font-bold uppercase">{isAuthenticated ? 'My Profile' : 'Login / Signup'}</span>
+                                                                 <div className="text-left">
+                                                                     <span className="text-sm font-bold uppercase block">{isAuthenticated ? 'My Profile' : 'Login / Signup'}</span>
+                                                                     {isAuthenticated && (user?.email || user?.mobile) && (
+                                                                         <span className="text-[11px] text-gray-500 block mt-0.5">{user?.email || user?.mobile}</span>
+                                                                     )}
+                                                                 </div>
                              </button>
                              
                              <button onClick={scrollToStore} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg w-full mt-2">
@@ -565,7 +618,10 @@ const Navbar: React.FC = () => {
     <AuthModal 
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
-        onSuccess={() => setIsAuthOpen(false)}
+                onSuccess={() => {
+                    setIsAuthOpen(false);
+                    navigate('/profile');
+                }}
     />
     </>
   );

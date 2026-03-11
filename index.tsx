@@ -8,6 +8,7 @@ import { CategoryProvider } from './context/CategoryContext';
 import { SortOptionsProvider } from './context/SortOptionsContext';
 import { FilterOptionsProvider } from './context/FilterOptionsContext';
 import { RatesProvider } from './context/RatesContext';
+import { WishlistProvider } from './context/WishlistContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -23,9 +24,11 @@ root.render(
           <FilterOptionsProvider>
             <RatesProvider>
               <ProductProvider>
+                <WishlistProvider>
                   <CartProvider>
                     <App />
                   </CartProvider>
+                </WishlistProvider>
               </ProductProvider>
             </RatesProvider>
           </FilterOptionsProvider>

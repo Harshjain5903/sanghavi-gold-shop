@@ -4,7 +4,7 @@ import { User, Phone, Mail, LogOut, Package, Edit2, Save, X } from 'lucide-react
 import { useNavigate } from 'react-router-dom';
 
 const ProfilePage: React.FC = () => {
-  const { user, logout, updateProfile } = useAuth();
+  const { user, logout, updateProfile, loading } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -13,10 +13,27 @@ const ProfilePage: React.FC = () => {
   });
 
   useEffect(() => {
-    if (!user) {
+    setFormData({
+      name: user?.name || '',
+      email: user?.email || ''
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!loading && !user) {
       navigate('/', { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-sm text-gray-500">Loading your account...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return null;
@@ -73,7 +90,7 @@ const ProfilePage: React.FC = () => {
                  
                  <div>
                    <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1"><Phone size={10} /> Mobile</label>
-                   <p className="font-medium text-gray-700">{user.mobile}</p>
+                   <p className="font-medium text-gray-700">{user.mobile || 'Not Provided'}</p>
                  </div>
 
                  <div>
