@@ -13,13 +13,12 @@ import {
     ChevronRight, ChevronDown, ChevronUp, Image as ImageIcon,
     AlertCircle, Layers, List, CheckCircle, Store, FolderPlus,
     Settings, X, Tag, TrendingUp, Sparkles, MinusCircle, UploadCloud, Filter,
-    Megaphone, RefreshCw, GripVertical, Crown, Menu, Type
+    Megaphone, RefreshCw, GripVertical, Crown, Menu, Type as TypeIcon, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { storage, auth, db } from '../lib/firebase';
+import { storage, auth } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
 
@@ -120,7 +119,7 @@ const AdminPage: React.FC = () => {
     setIsMobileMenuOpen(false); // Close mobile menu on nav
   }, [activeTab]);
 
-    // --- ADMIN AUTH: CHECK ACCESS ---
+    // --- ADMIN AUTH: CHECK THE SERVER-ISSUED ROLE CLAIM ---
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (!user) {
@@ -129,21 +128,29 @@ const AdminPage: React.FC = () => {
                 return;
             }
 
+            setAuthLoading(true);
+
             try {
-                const adminRef = doc(db, 'users', user.uid);
-                const adminSnap = await getDoc(adminRef);
-                const isAdminFlag = adminSnap.exists() && adminSnap.data()?.isAdmin === true;
-                setIsAdmin(isAdminFlag);
-                setAuthLoading(false);
-                if (!isAdminFlag) {
-                    setAuthError('Access denied. This account is not an admin.');
+                // Force-refresh so newly granted/revoked roles take effect immediately.
+                const token = await user.getIdTokenResult(true);
+                const hasAdminRole =
+                    token.claims.role === 'admin' || token.claims.admin === true;
+
+                if (!hasAdminRole) {
+                    setIsAdmin(false);
+                    setAuthError('Access denied. This account is not approved for the admin portal.');
                     await signOut(auth);
+                    return;
                 }
+
+                setAuthError('');
+                setIsAdmin(true);
             } catch (error) {
                 console.error('Admin auth check failed:', error);
                 setIsAdmin(false);
-                setAuthLoading(false);
                 setAuthError('Unable to verify admin access. Please try again.');
+            } finally {
+                setAuthLoading(false);
             }
         });
 
@@ -1836,7 +1843,7 @@ const AdminPage: React.FC = () => {
                                         />
                                         <div className="flex-1">
                                             <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                                                <Type size={16} /> Display "Price on Request" Label?
+                                                <TypeIcon size={16} /> Display "Price on Request" Label?
                                             </span>
                                             <p className="text-xs text-gray-500 mt-0.5">
                                                 If checked, "Price on Request" will be shown. If unchecked and price is 0, nothing will be shown.
