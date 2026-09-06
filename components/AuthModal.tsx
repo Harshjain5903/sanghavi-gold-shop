@@ -2,7 +2,15 @@ import React, { useState } from 'react';
 import { X, ArrowRight, User, Mail, Lock, Phone, AlertCircle, Loader2 } from 'lucide-react';
 import { SanghaviLogo } from './Navbar';
 import { auth, db } from '../lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signInWithPopup,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  type User,
+} from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 
 interface AuthModalProps {
@@ -38,6 +46,46 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       onClose();
   };
 
+  const saveUserProfile = async (user: User, fallbackName = '', fallbackMobile = '') => {
+    const finalName = user.displayName?.trim() || fallbackName || (user.email ? user.email.split('@')[0] : 'Customer');
+    const finalMobile = fallbackMobile || user.phoneNumber || '';
+
+    await setDoc(doc(db, 'users', user.uid), {
+      uid: user.uid,
+      name: finalName,
+      email: user.email || '',
+      mobile: finalMobile,
+      createdAt: new Date().toISOString(),
+      isGuest: false,
+    }, { merge: true });
+  };
+
+  const handleSocialSignIn = async (providerName: 'google' | 'facebook') => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      await saveUserProfile(userCredential.user);
+      resetForm();
+      onSuccess();
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in was cancelled. Please try again.');
+      } else if (err.code === 'auth/account-exists-with-different-credential') {
+        setError('This email is already registered with another sign-in method. Please use email login or the other provider.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('This sign-in method is not enabled in Firebase. Please enable it in the Firebase console.');
+      } else {
+        setError(err.message || 'Social sign-in failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -53,13 +101,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
             await updateProfile(user, { displayName: name });
 
             // 3. Create Firestore Profile
-            await setDoc(doc(db, 'users', user.uid), {
-                name,
-                email,
-                mobile,
-                createdAt: new Date().toISOString(),
-                isGuest: false
-            });
+            await saveUserProfile(user, name, mobile);
 
         } else {
             // Login
@@ -121,6 +163,33 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
                    <span>{error}</span>
                </div>
            )}
+
+           <div className="mb-5 space-y-3">
+             <button
+               type="button"
+               onClick={() => handleSocialSignIn('google')}
+               disabled={loading}
+               className="w-full border border-gray-300 bg-white text-gray-800 py-2.5 rounded-lg font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2"
+             >
+               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">G</span>
+               Continue with Google
+             </button>
+             <button
+               type="button"
+               onClick={() => handleSocialSignIn('facebook')}
+               disabled={loading}
+               className="w-full border border-gray-300 bg-white text-gray-800 py-2.5 rounded-lg font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2"
+             >
+               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">f</span>
+               Continue with Facebook
+             </button>
+           </div>
+
+           <div className="flex items-center gap-3 my-5">
+             <div className="h-px flex-1 bg-gray-200" />
+             <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">or</span>
+             <div className="h-px flex-1 bg-gray-200" />
+           </div>
 
            <form onSubmit={handleSubmit} className="space-y-4">
                {mode === 'signup' && (
