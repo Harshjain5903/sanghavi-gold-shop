@@ -8,7 +8,6 @@ import {
   updateProfile,
   signInWithPopup,
   GoogleAuthProvider,
-  FacebookAuthProvider,
   type User,
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -60,12 +59,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
     }, { merge: true });
   };
 
-  const handleSocialSignIn = async (providerName: 'google' | 'facebook') => {
+  const handleGoogleSignIn = async () => {
     setError('');
     setLoading(true);
 
     try {
-      const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
+      const provider = new GoogleAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
       await saveUserProfile(userCredential.user);
       resetForm();
@@ -75,11 +74,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       if (err.code === 'auth/popup-closed-by-user') {
         setError('Sign-in was cancelled. Please try again.');
       } else if (err.code === 'auth/account-exists-with-different-credential') {
-        setError('This email is already registered with another sign-in method. Please use email login or the other provider.');
+        setError('This email is already registered with another sign-in method. Please use email login.');
       } else if (err.code === 'auth/operation-not-allowed') {
-        setError('This sign-in method is not enabled in Firebase. Please enable it in the Firebase console.');
+        setError('Google sign-in is not enabled in Firebase. Please enable it in the Firebase console.');
       } else {
-        setError(err.message || 'Social sign-in failed. Please try again.');
+        setError(err.message || 'Google sign-in failed. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -164,24 +163,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
                </div>
            )}
 
-           <div className="mb-5 space-y-3">
+           <div className="mb-5">
              <button
                type="button"
-               onClick={() => handleSocialSignIn('google')}
+               onClick={handleGoogleSignIn}
                disabled={loading}
                className="w-full border border-gray-300 bg-white text-gray-800 py-2.5 rounded-lg font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2"
              >
                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">G</span>
                Continue with Google
-             </button>
-             <button
-               type="button"
-               onClick={() => handleSocialSignIn('facebook')}
-               disabled={loading}
-               className="w-full border border-gray-300 bg-white text-gray-800 py-2.5 rounded-lg font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2"
-             >
-               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">f</span>
-               Continue with Facebook
              </button>
            </div>
 
