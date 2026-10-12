@@ -21,6 +21,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
+import { checkAdminAccess, hasAdminClaim } from '../lib/adminAuth';
 
 // --- COMPONENTS ---
 
@@ -131,10 +132,7 @@ const AdminPage: React.FC = () => {
             setAuthLoading(true);
 
             try {
-                // Force-refresh so newly granted/revoked roles take effect immediately.
-                const token = await user.getIdTokenResult(true);
-                const hasAdminRole =
-                    token.claims.role === 'admin' || token.claims.admin === true;
+                const hasAdminRole = await checkAdminAccess(user);
 
                 if (!hasAdminRole) {
                     setIsAdmin(false);
@@ -217,11 +215,23 @@ const AdminPage: React.FC = () => {
         setAuthLoading(true);
 
         try {
-            await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+            const userCredential = await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+            const hasAdminRole = await checkAdminAccess(userCredential.user);
+
+            if (!hasAdminRole) {
+                await signOut(auth);
+                setAuthError('This account does not have admin privileges.');
+                setIsAdmin(false);
+                return;
+            }
+
+            setIsAdmin(true);
         } catch (error: any) {
             console.error('Admin login failed:', error);
             const message = error?.message || 'Login failed. Please check your email and password.';
             setAuthError(message);
+            setIsAdmin(false);
+        } finally {
             setAuthLoading(false);
         }
     };
@@ -763,7 +773,7 @@ const AdminPage: React.FC = () => {
   };
 
   const resetRatesInputs = () => {
-      syncRatesInputs(rates || DEFAULT_METAL_RATES);
+      syncRatesInputs(rates || DEFAULT_METAL_RATES, goldUnit, silverUnit);
       setRatesMessage('');
   };
 

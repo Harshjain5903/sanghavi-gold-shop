@@ -24,7 +24,6 @@ export const FilterOptionsProvider: React.FC<{ children: React.ReactNode }> = ({
         const items = docSnap.data().items as MegaMenuSection[] | undefined;
         setFilterSections(Array.isArray(items) && items.length > 0 ? items : DEFAULT_FILTER_SECTIONS);
       } else {
-        setDoc(filterRef, { items: DEFAULT_FILTER_SECTIONS });
         setFilterSections(DEFAULT_FILTER_SECTIONS);
       }
       setLoading(false);

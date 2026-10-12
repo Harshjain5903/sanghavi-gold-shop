@@ -170,8 +170,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const updateProfile = async (data: Partial<UserProfile>) => {
+  const updateProfile = async (changes: Partial<UserProfile>) => {
     if (!auth.currentUser) return;
+    // Only user-editable fields; firestore.rules rejects anything else.
+    const data: Partial<UserProfile> = {};
+    if (changes.name !== undefined) data.name = changes.name;
+    if (changes.email !== undefined) data.email = changes.email;
+    if (changes.mobile !== undefined) data.mobile = changes.mobile;
     try {
         const userRef = doc(db, 'users', auth.currentUser.uid);
         await setDoc(userRef, data, { merge: true });
