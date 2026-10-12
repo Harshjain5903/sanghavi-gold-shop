@@ -1,0 +1,54 @@
+// Database schema for the Sanghavi Gold API.
+// After editing: `npm run prisma:migrate -- --name <change>` creates a migration.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+}
+
+enum MemberStatus {
+  // Invited by email, but the person has not signed in with a verified email yet.
+  INVITED
+  // Signed in with a verified email; their Firebase account carries the role claim.
+  ACTIVE
+}
+
+// Who may use the admin portal. This table is the source of truth;
+// Firebase custom claims are a cached copy kept in sync by TeamService.
+model TeamMember {
+  id             String       @id @default(uuid())
+  email          String       @unique // always stored lowercase
+  role           TeamRole
+  status         MemberStatus @default(INVITED)
+  firebaseUid    String?      @unique
+  invitedByEmail String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("team_members")
+}
+
+// Append-only record of sensitive actions (who did what, when).
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorUid   String
+  actorEmail String
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+  @@map("audit_logs")
+}
