@@ -13,15 +13,16 @@ import {
     ChevronRight, ChevronDown, ChevronUp, Image as ImageIcon,
     AlertCircle, Layers, List, CheckCircle, Store, FolderPlus,
     Settings, X, Tag, TrendingUp, Sparkles, MinusCircle, UploadCloud, Filter,
-    Megaphone, RefreshCw, GripVertical, Crown, Menu, Type as TypeIcon, Lock
+    Megaphone, RefreshCw, GripVertical, Crown, Menu, Type as TypeIcon, Lock, Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { storage, auth } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
 import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
-import { checkAdminAccess, hasAdminClaim } from '../lib/adminAuth';
+import { AdminRole, checkAdminAccess } from '../lib/adminAuth';
+import TeamManager from '../components/admin/TeamManager';
 
 // --- COMPONENTS ---
 
@@ -78,9 +79,11 @@ const AdminPage: React.FC = () => {
     const [authLoading, setAuthLoading] = useState(true);
     const [authError, setAuthError] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
+    const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+    const isOwner = adminRole === 'owner';
   
   // --- MAIN APP STATE ---
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'add' | 'edit' | 'categories' | 'filters' | 'sort' | 'rates' | 'trending' | 'collections'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'add' | 'edit' | 'categories' | 'filters' | 'sort' | 'rates' | 'trending' | 'collections' | 'team'>('dashboard');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -125,6 +128,7 @@ const AdminPage: React.FC = () => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (!user) {
                 setIsAdmin(false);
+                setAdminRole(null);
                 setAuthLoading(false);
                 return;
             }
@@ -132,16 +136,20 @@ const AdminPage: React.FC = () => {
             setAuthLoading(true);
 
             try {
-                const hasAdminRole = await checkAdminAccess(user);
+                const access = await checkAdminAccess(user);
 
-                if (!hasAdminRole) {
+                if (!access.allowed) {
                     setIsAdmin(false);
-                    setAuthError('Access denied. This account is not approved for the admin portal.');
+                    setAdminRole(null);
+                    setAuthError(access.emailVerificationRequired
+                        ? 'You have been invited. Please verify your email address first, then sign in again.'
+                        : 'Access denied. This account is not approved for the admin portal.');
                     await signOut(auth);
                     return;
                 }
 
                 setAuthError('');
+                setAdminRole(access.role);
                 setIsAdmin(true);
             } catch (error) {
                 console.error('Admin auth check failed:', error);
@@ -208,30 +216,31 @@ const AdminPage: React.FC = () => {
     }
   }, [products, categories]);
 
-    // --- ADMIN LOGIN HANDLER ---
+    // --- ADMIN LOGIN HANDLERS ---
+    // These only sign in; the onAuthStateChanged listener above checks admin access.
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setAuthError('');
         setAuthLoading(true);
-
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-            const hasAdminRole = await checkAdminAccess(userCredential.user);
-
-            if (!hasAdminRole) {
-                await signOut(auth);
-                setAuthError('This account does not have admin privileges.');
-                setIsAdmin(false);
-                return;
-            }
-
-            setIsAdmin(true);
-        } catch (error: any) {
+            await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+        } catch (error) {
             console.error('Admin login failed:', error);
-            const message = error?.message || 'Login failed. Please check your email and password.';
-            setAuthError(message);
-            setIsAdmin(false);
-        } finally {
+            setAuthError('Login failed. Please check your email and password.');
+            setAuthLoading(false);
+        }
+    };
+
+    const handleGoogleLogin = async () => {
+        setAuthError('');
+        setAuthLoading(true);
+        try {
+            await signInWithPopup(auth, new GoogleAuthProvider());
+        } catch (error) {
+            console.error('Admin Google login failed:', error);
+            if ((error as { code?: string }).code !== 'auth/popup-closed-by-user') {
+                setAuthError('Google sign-in failed. Please try again.');
+            }
             setAuthLoading(false);
         }
     };
@@ -890,6 +899,18 @@ const AdminPage: React.FC = () => {
             <p className="text-sm text-gray-500 mt-2 font-medium">Sanghavi Gold</p>
           </div>
 
+          <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={authLoading}
+              className="w-full py-3 rounded-xl font-bold border-2 border-gray-200 text-gray-800 hover:bg-gray-50 transition text-sm disabled:opacity-60"
+          >
+              Continue with Google
+          </button>
+          <div className="flex items-center gap-3 my-6 text-xs font-bold text-gray-400 uppercase tracking-widest">
+              <div className="flex-1 h-px bg-gray-200"></div>or<div className="flex-1 h-px bg-gray-200"></div>
+          </div>
+
           <form onSubmit={handleLogin} className="space-y-6">
                         <div>
                                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Admin Email</label>
@@ -1029,6 +1050,18 @@ const AdminPage: React.FC = () => {
             >
                 <Plus size={18} /> Add Product
             </button>
+
+            {isOwner && (
+                <>
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-3 mt-6">Access</div>
+                    <button
+                        onClick={() => setActiveTab('team')}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'team' ? 'bg-gold-50 text-gold-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                    >
+                        <Shield size={18} /> Team &amp; Access
+                    </button>
+                </>
+            )}
         </nav>
 
         <div className="p-4 border-t border-gray-100 flex-shrink-0 space-y-2">
@@ -1078,6 +1111,8 @@ const AdminPage: React.FC = () => {
       <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto mt-14 md:mt-0">
         
         {/* VIEW: DASHBOARD */}
+        {activeTab === 'team' && isOwner && <TeamManager />}
+
         {activeTab === 'dashboard' && (
             <div className="max-w-5xl mx-auto animate-fade-in-up space-y-6 md:space-y-8">
                 
