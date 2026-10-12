@@ -1093,7 +1093,7 @@ const AdminPage: React.FC = () => {
       {isMobileMenuOpen && (
           <div className="fixed inset-0 z-50 flex md:hidden">
               <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)}></div>
-              <div className="relative w-64 bg-white h-full shadow-2xl flex flex-col animate-fade-in-up">
+              <div className="relative w-64 bg-white h-full shadow-2xl flex flex-col overflow-y-auto animate-fade-in-up">
                   <div className="absolute top-2 right-2">
                       <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-400 hover:text-black"><X size={20}/></button>
                   </div>
