@@ -18,7 +18,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { storage, auth } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { GoogleAuthProvider, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
 import { AdminRole, checkAdminAccess } from '../lib/adminAuth';
@@ -74,8 +74,6 @@ const AdminPage: React.FC = () => {
     const { rates, saveRates } = useRates();
   
     // --- ADMIN AUTH STATE ---
-    const [adminEmail, setAdminEmail] = useState('');
-    const [adminPassword, setAdminPassword] = useState('');
     const [authLoading, setAuthLoading] = useState(true);
     const [authError, setAuthError] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
@@ -216,29 +214,20 @@ const AdminPage: React.FC = () => {
     }
   }, [products, categories]);
 
-    // --- ADMIN LOGIN HANDLERS ---
-    // These only sign in; the onAuthStateChanged listener above checks admin access.
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setAuthError('');
-        setAuthLoading(true);
-        try {
-            await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-        } catch (error) {
-            console.error('Admin login failed:', error);
-            setAuthError('Login failed. Please check your email and password.');
-            setAuthLoading(false);
-        }
-    };
-
+    // --- ADMIN LOGIN ---
+    // Staff sign in only with their own Google account (no shared passwords).
+    // This only signs in; the onAuthStateChanged listener above checks admin access.
     const handleGoogleLogin = async () => {
         setAuthError('');
         setAuthLoading(true);
         try {
             await signInWithPopup(auth, new GoogleAuthProvider());
         } catch (error) {
+            const code = (error as { code?: string }).code;
             console.error('Admin Google login failed:', error);
-            if ((error as { code?: string }).code !== 'auth/popup-closed-by-user') {
+            if (code === 'auth/account-exists-with-different-credential') {
+                setAuthError('This email is registered with a password, not Google. Ask the owner to add your Google email instead.');
+            } else if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
                 setAuthError('Google sign-in failed. Please try again.');
             }
             setAuthLoading(false);
@@ -903,54 +892,19 @@ const AdminPage: React.FC = () => {
               type="button"
               onClick={handleGoogleLogin}
               disabled={authLoading}
-              className="w-full py-3 rounded-xl font-bold border-2 border-gray-200 text-gray-800 hover:bg-gray-50 transition text-sm disabled:opacity-60"
+              className="w-full py-4 rounded-xl font-bold transition shadow-lg bg-brand-black text-white hover:bg-gray-800 hover:shadow-xl active:scale-95 text-sm uppercase tracking-widest disabled:opacity-60"
           >
-              Continue with Google
+              {authLoading ? 'Signing In...' : 'Continue with Google'}
           </button>
-          <div className="flex items-center gap-3 my-6 text-xs font-bold text-gray-400 uppercase tracking-widest">
-              <div className="flex-1 h-px bg-gray-200"></div>or<div className="flex-1 h-px bg-gray-200"></div>
-          </div>
+          <p className="text-xs text-gray-500 text-center mt-4">
+              Use the Google account the owner gave admin access to.
+          </p>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-                        <div>
-                                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Admin Email</label>
-                                <input 
-                                    type="email" 
-                                    autoFocus
-                                    value={adminEmail}
-                                    onChange={(e) => setAdminEmail(e.target.value)}
-                                    className="w-full border-2 p-3 mt-2 rounded-xl outline-none transition-all duration-300 border-gray-200 focus:border-brand-black focus:ring-4 focus:ring-gray-100"
-                                    placeholder="admin@email.com"
-                                    required
-                                />
-                        </div>
-
-                        <div>
-                                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Password</label>
-                                <input 
-                                    type="password" 
-                                    value={adminPassword}
-                                    onChange={(e) => setAdminPassword(e.target.value)}
-                                    className="w-full border-2 p-3 mt-2 rounded-xl outline-none transition-all duration-300 border-gray-200 focus:border-brand-black focus:ring-4 focus:ring-gray-100"
-                                    placeholder="••••••••"
-                                    required
-                                />
-                        </div>
-
-                        {authError && (
-                            <div className="text-xs text-red-600 bg-red-50 border border-red-100 p-3 rounded-lg">
-                                {authError}
-                            </div>
-                        )}
-            
-                        <button 
-                            type="submit" 
-                            disabled={authLoading}
-                            className="w-full py-4 rounded-xl font-bold transition shadow-lg bg-brand-black text-white hover:bg-gray-800 hover:shadow-xl active:scale-95 text-sm uppercase tracking-widest disabled:opacity-60"
-                        >
-                            {authLoading ? 'Signing In...' : 'Authenticate'}
-                        </button>
-          </form>
+          {authError && (
+              <div className="text-xs text-red-600 bg-red-50 border border-red-100 p-3 rounded-lg mt-4">
+                  {authError}
+              </div>
+          )}
 
           <button onClick={() => navigate('/')} className="w-full text-center text-xs font-bold text-gray-400 mt-8 hover:text-brand-black transition uppercase tracking-wide">
               Return to Store
