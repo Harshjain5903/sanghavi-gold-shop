@@ -3,7 +3,7 @@ import { auth } from './firebase';
 // Backend base URL. Local dev defaults to the API on port 4000; production uses
 // VITE_API_URL, and features that need the API stay off until it is set.
 const API_URL =
-  import.meta.env.VITE_API_URL?.replace(/\/$/, '') || (import.meta.env.DEV ? 'http://localhost:4000/api' : '');
+  import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '') || (import.meta.env.DEV ? 'http://localhost:4000/api' : '');
 
 export const isApiConfigured = (): boolean => API_URL !== '';
 
