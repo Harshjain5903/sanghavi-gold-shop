@@ -18,8 +18,8 @@ import {
     Megaphone, RefreshCw, GripVertical, Crown, Menu, Type as TypeIcon, Lock, Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { storage, auth } from '../lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth } from '../lib/firebase';
+import { uploadImage } from '../lib/uploads';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
@@ -424,12 +424,7 @@ const AdminPage: React.FC = () => {
             if (target === 'product') {
                 const newImageUrls: string[] = [];
                 for (let i = 0; i < files.length; i++) {
-                    const file = files[i];
-                    if (file.size > 5 * 1024 * 1024) continue; 
-                    const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-                    const snapshot = await uploadBytes(storageRef, file);
-                    const downloadURL = await getDownloadURL(snapshot.ref);
-                    newImageUrls.push(downloadURL);
+                    newImageUrls.push(await uploadImage(files[i], 'products'));
                 }
                 setFormData(prev => {
                     const currentImages = prev.images || (prev.image ? [prev.image] : []);
@@ -441,10 +436,7 @@ const AdminPage: React.FC = () => {
                     };
                 });
             } else if (target === 'category' && catIndex !== undefined) {
-                const file = files[0];
-                const storageRef = ref(storage, `categories/${Date.now()}_${file.name}`);
-                const snapshot = await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(snapshot.ref);
+                const downloadURL = await uploadImage(files[0], 'categories');
                 const updatedCats = [...localCategories];
                 updatedCats[catIndex] = { ...updatedCats[catIndex], image: downloadURL };
                 setLocalCategories(updatedCats);
@@ -452,7 +444,7 @@ const AdminPage: React.FC = () => {
             }
         } catch (error: any) {
             console.error("Error uploading image:", error);
-            alert("⚠️ Upload Failed. Please try again.");
+            alert(`⚠️ Upload failed: ${(error as Error)?.message || 'please try again.'}`);
         } finally {
             setUploading(false);
             if (e.target) {

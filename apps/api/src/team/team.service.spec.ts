@@ -74,6 +74,7 @@ describe('TeamService', () => {
       ownerEmails: ['owner@shop.com'],
       corsOrigins: [],
       port: 0,
+      cloudinary: null,
     };
     service = new TeamService(repo, identity, audit as unknown as AuditService, config);
   });

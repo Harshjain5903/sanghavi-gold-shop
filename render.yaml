@@ -19,6 +19,12 @@ services:
         sync: false
       - key: FIREBASE_SERVICE_ACCOUNT_BASE64
         sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
       - key: OWNER_EMAILS
         value: hjain29@uic.edu
       - key: CORS_ORIGINS

@@ -7,6 +7,8 @@ export interface AppConfig {
   ownerEmails: string[];
   corsOrigins: string[];
   port: number;
+  /** Image hosting. Optional so the API still starts before it is configured. */
+  cloudinary: { cloudName: string; apiKey: string; apiSecret: string } | null;
 }
 
 const splitList = (value: string | undefined): string[] =>
@@ -29,6 +31,14 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     ownerEmails: splitList(env.OWNER_EMAILS).map((email) => email.toLowerCase()),
     corsOrigins: splitList(env.CORS_ORIGINS),
     port: Number(env.PORT) || 4000,
+    cloudinary:
+      env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET
+        ? {
+            cloudName: env.CLOUDINARY_CLOUD_NAME.trim(),
+            apiKey: env.CLOUDINARY_API_KEY.trim(),
+            apiSecret: env.CLOUDINARY_API_SECRET.trim(),
+          }
+        : null,
   };
 };
 
