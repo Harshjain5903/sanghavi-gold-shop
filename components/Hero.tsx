@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
 import { ChevronRight, ChevronLeft, Sparkles, ArrowRight } from 'lucide-react';
+import { isPricedProduct } from '../lib/pricing';
 
 const Hero: React.FC = () => {
   const { products } = useProducts();
@@ -117,7 +118,7 @@ const Hero: React.FC = () => {
         <div className="absolute inset-0 transition-transform duration-700 ease-in-out bg-gray-200">
             <img
                 key={currentSlide.id} 
-                src={currentSlide.image}
+                src={currentSlide.image || currentSlide.images?.[0]}
                 alt={currentSlide.name}
                 className="w-full h-full object-cover md:object-center object-top animate-fade-in-up" 
                 style={{ animationDuration: '0.6s' }}
@@ -146,10 +147,14 @@ const Hero: React.FC = () => {
                 
                 {/* Price/Weight & CTA Row */}
                 <div className="flex items-end justify-between mt-3 md:mt-4">
-                  {(currentSlide.cardDisplayMode || 'price') === 'price' ? (
+                  {isPricedProduct(currentSlide) ? (
                     <div className="flex flex-col">
                       <span className="text-[10px] md:text-xs text-gray-300 uppercase tracking-wider font-medium mb-0.5">Starting At</span>
                       <span className="text-xl md:text-3xl font-bold text-white tracking-wide">₹{currentSlide.price.toLocaleString('en-IN')}</span>
+                    </div>
+                  ) : (currentSlide.cardDisplayMode || 'price') === 'price' && currentSlide.priceOnRequest ? (
+                    <div className="flex flex-col">
+                      <span className="text-xl md:text-3xl font-bold text-white tracking-wide">Price on Request</span>
                     </div>
                   ) : (currentSlide.cardDisplayMode || 'price') === 'weight' && currentSlide.weight ? (
                     <div className="flex flex-col">

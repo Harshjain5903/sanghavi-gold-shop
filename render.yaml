@@ -1,0 +1,25 @@
+# Render Blueprint for the backend API (https://render.com/docs/blueprint-spec).
+# Secrets are marked sync: false, so Render asks for them in its dashboard;
+# they are never stored in this file.
+services:
+  - type: web
+    name: sanghavi-gold-api
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: apps/api
+    # Free instances have no pre-deploy step, so migrations run at the end of the build.
+    buildCommand: npm ci && npx prisma generate && npm run build && npx prisma migrate deploy
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_BASE64
+        sync: false
+      - key: OWNER_EMAILS
+        value: hjain29@uic.edu
+      - key: CORS_ORIGINS
+        value: https://sanghavigold.com,https://www.sanghavigold.com,https://sanghavi-gold-shop.vercel.app

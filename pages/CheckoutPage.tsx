@@ -68,7 +68,9 @@ const CheckoutPage: React.FC = () => {
       message += `   Link: ${itemUrl}\n\n`;
     });
 
-    const totalVal = targetItems.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
+    const totalVal = targetItems
+      .filter(isPricedItem)
+      .reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
     if (totalVal > 0) {
       message += `Total Selected Value (priced items): ₹${totalVal.toLocaleString('en-IN')}\n\n`;
     } else {

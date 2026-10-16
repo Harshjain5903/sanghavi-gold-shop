@@ -25,8 +25,7 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (docSnap.exists()) {
         setCategories(docSnap.data().items as NavItem[]);
       } else {
-        // First time initialization: seed with defaults
-        setDoc(navRef, { items: DEFAULT_NAV_CONFIG });
+        // Doc not created yet: fall back to defaults (only admins may write settings)
         setCategories(DEFAULT_NAV_CONFIG);
       }
       setLoading(false);

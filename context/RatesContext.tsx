@@ -33,7 +33,6 @@ export const RatesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             updatedAt: data?.updatedAt || ''
           });
         } else {
-          setDoc(ratesRef, DEFAULT_METAL_RATES);
           setRates(DEFAULT_METAL_RATES);
         }
         setLoading(false);

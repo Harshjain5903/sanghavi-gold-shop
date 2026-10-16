@@ -9,7 +9,7 @@ import { SHOP_INFO } from '../constants';
 
 const ProductDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { getProductById, products } = useProducts();
+  const { getProductById, products, loading: productsLoading } = useProducts();
   const { addToCart } = useCart();
   const navigate = useNavigate();
   
@@ -58,6 +58,14 @@ const ProductDetailsPage: React.FC = () => {
       .slice(0, 8); // Limit to top 8 recommendations
   }, [product, products]);
 
+
+  if (!product && productsLoading) {
+    return (
+        <div className="min-h-screen flex items-center justify-center p-10 text-center">
+            <p className="text-gray-500">Loading product…</p>
+        </div>
+    );
+  }
 
   if (!product) {
     return (

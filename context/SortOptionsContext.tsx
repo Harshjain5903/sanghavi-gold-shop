@@ -23,7 +23,6 @@ export const SortOptionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const items = docSnap.data().items as string[] | undefined;
         setSortOptions(Array.isArray(items) && items.length > 0 ? items : DEFAULT_SORT_OPTIONS);
       } else {
-        setDoc(sortRef, { items: DEFAULT_SORT_OPTIONS });
         setSortOptions(DEFAULT_SORT_OPTIONS);
       }
       setLoading(false);

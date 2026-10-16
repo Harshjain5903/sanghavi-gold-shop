@@ -13,14 +13,16 @@ import {
     ChevronRight, ChevronDown, ChevronUp, Image as ImageIcon,
     AlertCircle, Layers, List, CheckCircle, Store, FolderPlus,
     Settings, X, Tag, TrendingUp, Sparkles, MinusCircle, UploadCloud, Filter,
-    Megaphone, RefreshCw, GripVertical, Crown, Menu, Type as TypeIcon, Lock
+    Megaphone, RefreshCw, GripVertical, Crown, Menu, Type as TypeIcon, Lock, Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { storage, auth } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
+import { AdminRole, checkAdminAccess } from '../lib/adminAuth';
+import TeamManager from '../components/admin/TeamManager';
 
 // --- COMPONENTS ---
 
@@ -72,14 +74,14 @@ const AdminPage: React.FC = () => {
     const { rates, saveRates } = useRates();
   
     // --- ADMIN AUTH STATE ---
-    const [adminEmail, setAdminEmail] = useState('');
-    const [adminPassword, setAdminPassword] = useState('');
     const [authLoading, setAuthLoading] = useState(true);
     const [authError, setAuthError] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
+    const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+    const isOwner = adminRole === 'owner';
   
   // --- MAIN APP STATE ---
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'add' | 'edit' | 'categories' | 'filters' | 'sort' | 'rates' | 'trending' | 'collections'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'add' | 'edit' | 'categories' | 'filters' | 'sort' | 'rates' | 'trending' | 'collections' | 'team'>('dashboard');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -124,6 +126,7 @@ const AdminPage: React.FC = () => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (!user) {
                 setIsAdmin(false);
+                setAdminRole(null);
                 setAuthLoading(false);
                 return;
             }
@@ -131,19 +134,20 @@ const AdminPage: React.FC = () => {
             setAuthLoading(true);
 
             try {
-                // Force-refresh so newly granted/revoked roles take effect immediately.
-                const token = await user.getIdTokenResult(true);
-                const hasAdminRole =
-                    token.claims.role === 'admin' || token.claims.admin === true;
+                const access = await checkAdminAccess(user);
 
-                if (!hasAdminRole) {
+                if (!access.allowed) {
                     setIsAdmin(false);
-                    setAuthError('Access denied. This account is not approved for the admin portal.');
+                    setAdminRole(null);
+                    setAuthError(access.emailVerificationRequired
+                        ? 'You have been invited. Please verify your email address first, then sign in again.'
+                        : 'Access denied. This account is not approved for the admin portal.');
                     await signOut(auth);
                     return;
                 }
 
                 setAuthError('');
+                setAdminRole(access.role);
                 setIsAdmin(true);
             } catch (error) {
                 console.error('Admin auth check failed:', error);
@@ -210,18 +214,22 @@ const AdminPage: React.FC = () => {
     }
   }, [products, categories]);
 
-    // --- ADMIN LOGIN HANDLER ---
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    // --- ADMIN LOGIN ---
+    // Staff sign in only with their own Google account (no shared passwords).
+    // This only signs in; the onAuthStateChanged listener above checks admin access.
+    const handleGoogleLogin = async () => {
         setAuthError('');
         setAuthLoading(true);
-
         try {
-            await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-        } catch (error: any) {
-            console.error('Admin login failed:', error);
-            const message = error?.message || 'Login failed. Please check your email and password.';
-            setAuthError(message);
+            await signInWithPopup(auth, new GoogleAuthProvider());
+        } catch (error) {
+            const code = (error as { code?: string }).code;
+            console.error('Admin Google login failed:', error);
+            if (code === 'auth/account-exists-with-different-credential') {
+                setAuthError('This email is registered with a password, not Google. Ask the owner to add your Google email instead.');
+            } else if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+                setAuthError('Google sign-in failed. Please try again.');
+            }
             setAuthLoading(false);
         }
     };
@@ -763,7 +771,7 @@ const AdminPage: React.FC = () => {
   };
 
   const resetRatesInputs = () => {
-      syncRatesInputs(rates || DEFAULT_METAL_RATES);
+      syncRatesInputs(rates || DEFAULT_METAL_RATES, goldUnit, silverUnit);
       setRatesMessage('');
   };
 
@@ -880,46 +888,23 @@ const AdminPage: React.FC = () => {
             <p className="text-sm text-gray-500 mt-2 font-medium">Sanghavi Gold</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-                        <div>
-                                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Admin Email</label>
-                                <input 
-                                    type="email" 
-                                    autoFocus
-                                    value={adminEmail}
-                                    onChange={(e) => setAdminEmail(e.target.value)}
-                                    className="w-full border-2 p-3 mt-2 rounded-xl outline-none transition-all duration-300 border-gray-200 focus:border-brand-black focus:ring-4 focus:ring-gray-100"
-                                    placeholder="admin@email.com"
-                                    required
-                                />
-                        </div>
+          <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={authLoading}
+              className="w-full py-4 rounded-xl font-bold transition shadow-lg bg-brand-black text-white hover:bg-gray-800 hover:shadow-xl active:scale-95 text-sm uppercase tracking-widest disabled:opacity-60"
+          >
+              {authLoading ? 'Signing In...' : 'Continue with Google'}
+          </button>
+          <p className="text-xs text-gray-500 text-center mt-4">
+              Use the Google account the owner gave admin access to.
+          </p>
 
-                        <div>
-                                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Password</label>
-                                <input 
-                                    type="password" 
-                                    value={adminPassword}
-                                    onChange={(e) => setAdminPassword(e.target.value)}
-                                    className="w-full border-2 p-3 mt-2 rounded-xl outline-none transition-all duration-300 border-gray-200 focus:border-brand-black focus:ring-4 focus:ring-gray-100"
-                                    placeholder="••••••••"
-                                    required
-                                />
-                        </div>
-
-                        {authError && (
-                            <div className="text-xs text-red-600 bg-red-50 border border-red-100 p-3 rounded-lg">
-                                {authError}
-                            </div>
-                        )}
-            
-                        <button 
-                            type="submit" 
-                            disabled={authLoading}
-                            className="w-full py-4 rounded-xl font-bold transition shadow-lg bg-brand-black text-white hover:bg-gray-800 hover:shadow-xl active:scale-95 text-sm uppercase tracking-widest disabled:opacity-60"
-                        >
-                            {authLoading ? 'Signing In...' : 'Authenticate'}
-                        </button>
-          </form>
+          {authError && (
+              <div className="text-xs text-red-600 bg-red-50 border border-red-100 p-3 rounded-lg mt-4">
+                  {authError}
+              </div>
+          )}
 
           <button onClick={() => navigate('/')} className="w-full text-center text-xs font-bold text-gray-400 mt-8 hover:text-brand-black transition uppercase tracking-wide">
               Return to Store
@@ -1019,6 +1004,18 @@ const AdminPage: React.FC = () => {
             >
                 <Plus size={18} /> Add Product
             </button>
+
+            {isOwner && (
+                <>
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-3 mt-6">Access</div>
+                    <button
+                        onClick={() => setActiveTab('team')}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'team' ? 'bg-gold-50 text-gold-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                    >
+                        <Shield size={18} /> Team &amp; Access
+                    </button>
+                </>
+            )}
         </nav>
 
         <div className="p-4 border-t border-gray-100 flex-shrink-0 space-y-2">
@@ -1050,7 +1047,7 @@ const AdminPage: React.FC = () => {
       {isMobileMenuOpen && (
           <div className="fixed inset-0 z-50 flex md:hidden">
               <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)}></div>
-              <div className="relative w-64 bg-white h-full shadow-2xl flex flex-col animate-fade-in-up">
+              <div className="relative w-64 bg-white h-full shadow-2xl flex flex-col overflow-y-auto animate-fade-in-up">
                   <div className="absolute top-2 right-2">
                       <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-400 hover:text-black"><X size={20}/></button>
                   </div>
@@ -1068,6 +1065,8 @@ const AdminPage: React.FC = () => {
       <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto mt-14 md:mt-0">
         
         {/* VIEW: DASHBOARD */}
+        {activeTab === 'team' && isOwner && <TeamManager />}
+
         {activeTab === 'dashboard' && (
             <div className="max-w-5xl mx-auto animate-fade-in-up space-y-6 md:space-y-8">
                 

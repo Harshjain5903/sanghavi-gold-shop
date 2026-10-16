@@ -5,6 +5,7 @@ import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'fireb
 
 interface ProductContextType {
   products: Product[];
+  loading: boolean;
   addProduct: (product: Product) => Promise<void>;
   updateProduct: (updatedProduct: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
@@ -44,13 +45,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoading(false);
       },
       (error) => {
-        // --- ERROR HANDLING FOR WRONG RULES ---
-        console.error("Firebase Database Error:", error);
-        if (error.code === 'permission-denied') {
-          alert("⛔ FIREBASE ERROR: Permission Denied.\n\nYou pasted the WRONG rules in the Firestore Database section.\n\nPlease go to Firebase Console > Firestore Database > Rules.\nDelete the code there and paste the code starting with 'service cloud.firestore'.\n\n(See the chat for the correct code!)");
-        } else {
-          console.log("Database connection issue. Ensure you are online.");
-        }
+        console.error('Failed to load products:', error);
         setLoading(false);
       }
     );
@@ -77,7 +72,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   return (
-    <ProductContext.Provider value={{ products, addProduct, updateProduct, deleteProduct, getProductById }}>
+    <ProductContext.Provider value={{ products, loading, addProduct, updateProduct, deleteProduct, getProductById }}>
       {children}
     </ProductContext.Provider>
   );

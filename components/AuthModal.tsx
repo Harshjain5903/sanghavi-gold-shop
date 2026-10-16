@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ArrowRight, User, Mail, Lock, Phone, AlertCircle, Loader2 } from 'lucide-react';
+import { X, ArrowRight, User as UserIcon, Mail, Lock, Phone, AlertCircle, Loader2 } from 'lucide-react';
 import { SanghaviLogo } from './Navbar';
 import { auth, db } from '../lib/firebase';
 import {
@@ -187,7 +187,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
                     <div>
                         <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Full Name</label>
                         <div className="relative">
-                            <User className="absolute left-3 top-3 text-gray-400" size={18} />
+                            <UserIcon className="absolute left-3 top-3 text-gray-400" size={18} />
                             <input 
                                 type="text" 
                                 required 
