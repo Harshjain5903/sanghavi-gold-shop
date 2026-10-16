@@ -175,6 +175,28 @@ const ProductDetailsPage: React.FC = () => {
                         )}
                     </div>
                     <p className="text-xs text-gray-500">Inclusive of all taxes</p>
+                    {product.priceBreakdown && (
+                      <details className="mt-3 text-sm text-gray-600 max-w-sm">
+                        <summary className="cursor-pointer font-medium text-gray-800">Price breakdown</summary>
+                        <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-6 gap-y-1 tabular-nums">
+                          <dt>Metal ({product.priceBreakdown.netWeightGrams} g × ₹{product.priceBreakdown.ratePerGram.toLocaleString('en-IN')}/g)</dt>
+                          <dd className="text-right">₹{product.priceBreakdown.metalValue.toLocaleString('en-IN')}</dd>
+                          <dt>Making charges</dt>
+                          <dd className="text-right">₹{product.priceBreakdown.makingCharge.toLocaleString('en-IN')}</dd>
+                          {product.priceBreakdown.stoneValue > 0 && (
+                            <>
+                              <dt>Stone value</dt>
+                              <dd className="text-right">₹{product.priceBreakdown.stoneValue.toLocaleString('en-IN')}</dd>
+                            </>
+                          )}
+                          <dt>GST (3%)</dt>
+                          <dd className="text-right">₹{product.priceBreakdown.gst.toLocaleString('en-IN')}</dd>
+                          <dt className="font-semibold text-gray-900 border-t border-gray-200 pt-1">Total</dt>
+                          <dd className="text-right font-semibold text-gray-900 border-t border-gray-200 pt-1">₹{product.priceBreakdown.total.toLocaleString('en-IN')}</dd>
+                        </dl>
+                        <p className="mt-2 text-xs text-gray-500">Based on today's {product.purity || 'metal'} rate. Prices update with the daily rate.</p>
+                      </details>
+                    )}
                   </>
                 ) : showPriceOnRequest ? (
                   <div className="bg-gold-50 p-4 rounded-lg inline-block">

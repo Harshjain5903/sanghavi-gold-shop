@@ -116,13 +116,18 @@ const Hero: React.FC = () => {
         
         {/* 1. Main Background Image */}
         <div className="absolute inset-0 transition-transform duration-700 ease-in-out bg-gray-200">
-            <img
-                key={currentSlide.id} 
-                src={currentSlide.image || currentSlide.images?.[0]}
-                alt={currentSlide.name}
-                className="w-full h-full object-cover md:object-center object-top animate-fade-in-up" 
-                style={{ animationDuration: '0.6s' }}
-            />
+            {currentSlide.image || currentSlide.images?.[0] ? (
+                <img
+                    key={currentSlide.id}
+                    src={currentSlide.image || currentSlide.images?.[0]}
+                    alt={currentSlide.name}
+                    className="w-full h-full object-cover md:object-center object-top animate-fade-in-up"
+                    style={{ animationDuration: '0.6s' }}
+                />
+            ) : (
+                // No photo uploaded yet: show a neutral backdrop instead of a broken image.
+                <div key={currentSlide.id} className="w-full h-full bg-gradient-to-br from-gray-700 via-gray-800 to-black" aria-hidden="true" />
+            )}
         </div>
 
         {/* 2. Premium Gradient Overlay - Softer and more Apple-like */}

@@ -4,7 +4,9 @@ import { useCategories } from '../context/CategoryContext';
 import { useSortOptions } from '../context/SortOptionsContext';
 import { useFilterOptions } from '../context/FilterOptionsContext';
 import { useRates } from '../context/RatesContext';
-import { Product, NavItem, ProductSpecification, MetalRates } from '../types';
+import { Product, NavItem, ProductSpecification, MetalRates, ProductPricing } from '../types';
+import { DEFAULT_PRICING } from '../context/ProductContext';
+import { previewPrice } from '../lib/pricing';
 import { MegaMenuSection } from '../types';
 import { DEFAULT_METAL_RATES } from '../constants';
 import { 
@@ -67,7 +69,7 @@ const ActionCard = ({ title, icon: Icon, onClick, color }: any) => (
 );
 
 const AdminPage: React.FC = () => {
-  const { products, addProduct, updateProduct, deleteProduct } = useProducts();
+  const { products, addProduct, updateProduct, deleteProduct, refresh: refreshProducts } = useProducts();
   const { categories, saveCategories } = useCategories();
     const { sortOptions, saveSortOptions, resetToDefault: resetSortOptions } = useSortOptions();
     const { filterSections, saveFilterSections, resetToDefault: resetFilterOptions } = useFilterOptions();
@@ -260,10 +262,15 @@ const AdminPage: React.FC = () => {
     inStock: true,
     isNew: false,
     isTrending: false,
-    isFeaturedCollection: false 
+    isFeaturedCollection: false,
+    pricing: DEFAULT_PRICING
   };
 
   const [formData, setFormData] = useState<Product>(initialFormState);
+  const pricing = formData.pricing || DEFAULT_PRICING;
+  const setPricing = (changes: Partial<ProductPricing>) =>
+      setFormData(prev => ({ ...prev, pricing: { ...(prev.pricing || DEFAULT_PRICING), ...changes } }));
+  const pricePreview = previewPrice(pricing, rates || (DEFAULT_METAL_RATES as MetalRates));
 
     const normalizeText = (value: string) => value
         .toLowerCase()
@@ -761,7 +768,8 @@ const AdminPage: React.FC = () => {
               updatedAt: new Date().toISOString()
           };
           await saveRates(nextRates);
-          setRatesMessage('Rates updated successfully.');
+          await refreshProducts(); // rate-based prices change with the rate
+          setRatesMessage('Rates updated. All rate-based prices now use the new rate.');
       } catch (e) {
           console.error(e);
           setRatesMessage('Failed to update rates.');
@@ -1809,43 +1817,99 @@ const AdminPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="border-t border-gray-200 pt-4">
-                                    <div className="grid grid-cols-2 gap-4">
+                                <div className="border-t border-gray-200 pt-4 space-y-4">
+                                    <p className="text-xs text-gray-500">
+                                        Price is calculated automatically: today's rate × net weight + making charge + stone value + 3% GST.
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-900 mb-1">Selling Price (₹)</label>
-                                            <input 
-                                                type="number" 
-                                                className="w-full border border-gray-300 p-2.5 rounded-lg font-bold text-lg text-gray-900 placeholder-gray-300" 
-                                                value={formData.price === 0 ? '' : formData.price} 
-                                                onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
-                                                placeholder="Leave empty if none"
+                                            <label htmlFor="pricing-purity" className="block text-sm font-medium text-gray-900 mb-1">Metal &amp; Purity</label>
+                                            <select
+                                                id="pricing-purity"
+                                                value={pricing.metalPurity}
+                                                onChange={e => setPricing({ metalPurity: e.target.value as ProductPricing['metalPurity'] })}
+                                                className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white"
+                                            >
+                                                <option value="GOLD_22K">22K Gold (916)</option>
+                                                <option value="GOLD_18K">18K Gold (750)</option>
+                                                <option value="GOLD_24K">24K Gold (999)</option>
+                                                <option value="SILVER">Silver</option>
+                                                <option value="NONE">Not rate-based</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="pricing-weight" className="block text-sm font-medium text-gray-900 mb-1">Net Weight (grams)</label>
+                                            <input
+                                                id="pricing-weight"
+                                                type="number" min="0" step="0.001"
+                                                value={pricing.netWeightGrams ?? ''}
+                                                onChange={e => setPricing({ netWeightGrams: e.target.value === '' ? null : Number(e.target.value) })}
+                                                className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 placeholder-gray-300"
+                                                placeholder="e.g. 5.200"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-900 mb-1">MRP / Compare Price (₹)</label>
-                                            <input 
-                                                type="number" 
-                                                className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 placeholder-gray-300" 
-                                                value={!formData.originalPrice ? '' : formData.originalPrice} 
-                                                onChange={e => setFormData({...formData, originalPrice: Number(e.target.value)})} 
-                                                placeholder="Optional"
+                                            <label htmlFor="pricing-making-type" className="block text-sm font-medium text-gray-900 mb-1">Making Charge</label>
+                                            <div className="flex gap-2">
+                                                <select
+                                                    id="pricing-making-type"
+                                                    value={pricing.makingChargeType}
+                                                    onChange={e => setPricing({ makingChargeType: e.target.value as ProductPricing['makingChargeType'] })}
+                                                    className="border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white"
+                                                >
+                                                    <option value="PERCENT">% of metal</option>
+                                                    <option value="PER_GRAM">₹ per gram</option>
+                                                    <option value="FLAT">₹ per piece</option>
+                                                </select>
+                                                <input
+                                                    id="pricing-making-value"
+                                                    aria-label="Making charge value"
+                                                    type="number" min="0" step="0.01"
+                                                    value={pricing.makingChargeValue || ''}
+                                                    onChange={e => setPricing({ makingChargeValue: Number(e.target.value) || 0 })}
+                                                    className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 placeholder-gray-300"
+                                                    placeholder={pricing.makingChargeType === 'PERCENT' ? 'e.g. 12' : 'e.g. 500'}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="pricing-stone" className="block text-sm font-medium text-gray-900 mb-1">Stone / Diamond Value (₹)</label>
+                                            <input
+                                                id="pricing-stone"
+                                                type="number" min="0" step="1"
+                                                value={pricing.stoneValue || ''}
+                                                onChange={e => setPricing({ stoneValue: Number(e.target.value) || 0 })}
+                                                className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 placeholder-gray-300"
+                                                placeholder="0"
                                             />
                                         </div>
                                     </div>
-                                    
-                                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition mt-4">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={formData.priceOnRequest} 
-                                            onChange={e => setFormData({...formData, priceOnRequest: e.target.checked})} 
-                                            className="w-5 h-5 accent-brand-black rounded" 
+
+                                    <div className="flex items-center justify-between rounded-lg bg-gold-50 border border-gold-100 px-4 py-3">
+                                        <span className="text-sm font-medium text-gray-700">Price customers will see</span>
+                                        <span className="text-lg font-bold text-gray-900">
+                                            {pricePreview !== null ? `₹${pricePreview.toLocaleString('en-IN')}` : 'Price on Request'}
+                                        </span>
+                                    </div>
+                                    {pricePreview === null && !pricing.priceOnRequest && (
+                                        <p className="text-xs text-gray-500">
+                                            Shown as "Price on Request" until the metal, net weight and today's rate are all filled in.
+                                        </p>
+                                    )}
+
+                                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition">
+                                        <input
+                                            type="checkbox"
+                                            checked={pricing.priceOnRequest}
+                                            onChange={e => setPricing({ priceOnRequest: e.target.checked })}
+                                            className="w-5 h-5 accent-brand-black rounded"
                                         />
                                         <div className="flex-1">
                                             <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                                                <TypeIcon size={16} /> Display "Price on Request" Label?
+                                                <TypeIcon size={16} /> Always show "Price on Request"
                                             </span>
                                             <p className="text-xs text-gray-500 mt-0.5">
-                                                If checked, "Price on Request" will be shown. If unchecked and price is 0, nothing will be shown.
+                                                Tick for custom or high-value pieces. Untick once the making charge is checked to show the live price.
                                             </p>
                                         </div>
                                     </label>

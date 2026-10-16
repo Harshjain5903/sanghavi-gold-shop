@@ -18,6 +18,32 @@ export interface ProductSpecification {
   value: string;
 }
 
+export type MetalPurity = 'GOLD_24K' | 'GOLD_22K' | 'GOLD_18K' | 'SILVER' | 'NONE';
+export type MakingChargeType = 'PER_GRAM' | 'PERCENT' | 'FLAT';
+
+/** Inputs the server uses to compute a product's price from today's metal rate. */
+export interface ProductPricing {
+  metalPurity: MetalPurity;
+  netWeightGrams: number | null;
+  makingChargeType: MakingChargeType;
+  makingChargeValue: number;
+  stoneValue: number;
+  /** Admin forces "Price on Request" even when the price could be computed. */
+  priceOnRequest: boolean;
+}
+
+/** Server-computed price, in ₹. */
+export interface PriceBreakdown {
+  ratePerGram: number;
+  netWeightGrams: number;
+  metalValue: number;
+  makingCharge: number;
+  stoneValue: number;
+  subtotal: number;
+  gst: number;
+  total: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -38,6 +64,8 @@ export interface Product {
   isTrending?: boolean; // Existing Trending Flag
   isFeaturedCollection?: boolean; // New: For Homepage Hero Slider
   inStock?: boolean;
+  pricing?: ProductPricing;
+  priceBreakdown?: PriceBreakdown | null;
 }
 
 export interface CartItem extends Product {

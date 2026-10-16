@@ -1,78 +1,95 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product } from '../types';
-import { db } from '../lib/firebase';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Product, ProductPricing } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface ProductContextType {
   products: Product[];
   loading: boolean;
+  error: string;
   addProduct: (product: Product) => Promise<void>;
   updateProduct: (updatedProduct: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   getProductById: (id: string) => Product | undefined;
+  refresh: () => Promise<void>;
 }
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
+export const DEFAULT_PRICING: ProductPricing = {
+  metalPurity: 'NONE',
+  netWeightGrams: null,
+  makingChargeType: 'PERCENT',
+  makingChargeValue: 0,
+  stoneValue: 0,
+  priceOnRequest: true,
+};
+
+/** Only the fields an admin may edit; prices are computed by the server. */
+const toProductInput = (product: Product) => {
+  const images = (product.images?.length ? product.images : [product.image]).filter(Boolean);
+  return {
+    name: product.name,
+    description: product.description || '',
+    category: product.category || [],
+    subcategory: product.subcategory || '',
+    images,
+    videos: product.videos || [],
+    specifications: (product.specifications || []).filter((s) => s.key.trim() || s.value.trim()),
+    weight: product.weight || '',
+    cardDisplayMode: product.cardDisplayMode || 'price',
+    inStock: product.inStock !== false,
+    isNew: !!product.isNew,
+    isTrending: !!product.isTrending,
+    isFeaturedCollection: !!product.isFeaturedCollection,
+    pricing: product.pricing || DEFAULT_PRICING,
+  };
+};
+
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Load from Firebase Realtime Database (Firestore)
-  useEffect(() => {
-    // We listen to the collection in real-time
-    const unsubscribe = onSnapshot(
-      collection(db, 'products'), 
-      (snapshot) => {
-        const productsData = snapshot.docs.map(doc => {
-          const data = doc.data();
-          // SANITIZATION: Ensure category is always an array to prevent app crashes
-          let safeCategory: string[] = [];
-          if (Array.isArray(data.category)) {
-            safeCategory = data.category;
-          } else if (typeof data.category === 'string') {
-            safeCategory = [data.category];
-          }
-
-          return {
-            id: doc.id,
-            ...data,
-            category: safeCategory
-          };
-        }) as Product[];
-        
-        setProducts(productsData);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Failed to load products:', error);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
+  const refresh = useCallback(async () => {
+    try {
+      setProducts(await apiFetch<Product[]>('/products'));
+      setError('');
+    } catch (err) {
+      console.error('Failed to load products:', err);
+      setError('Products could not be loaded. Please refresh the page.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   const addProduct = async (product: Product) => {
-    const { id, ...data } = product; // Remove empty ID, let firebase generate it
-    await addDoc(collection(db, 'products'), data);
+    await apiFetch('/products', { method: 'POST', body: JSON.stringify(toProductInput(product)) });
+    await refresh();
   };
 
   const updateProduct = async (updatedProduct: Product) => {
-    const productRef = doc(db, 'products', updatedProduct.id);
-    await updateDoc(productRef, { ...updatedProduct });
+    await apiFetch(`/products/${encodeURIComponent(updatedProduct.id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(toProductInput(updatedProduct)),
+    });
+    await refresh();
   };
 
   const deleteProduct = async (id: string) => {
-    await deleteDoc(doc(db, 'products', id));
+    await apiFetch(`/products/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await refresh();
   };
 
-  const getProductById = (id: string) => {
-    return products.find(p => p.id === id);
-  };
+  const getProductById = (id: string) => products.find((p) => p.id === id);
 
   return (
-    <ProductContext.Provider value={{ products, loading, addProduct, updateProduct, deleteProduct, getProductById }}>
+    <ProductContext.Provider
+      value={{ products, loading, error, addProduct, updateProduct, deleteProduct, getProductById, refresh }}
+    >
       {children}
     </ProductContext.Provider>
   );
