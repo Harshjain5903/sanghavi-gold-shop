@@ -16,13 +16,14 @@ describe('UploadsService', () => {
   it('signs folder + timestamp the way Cloudinary expects', () => {
     const result = new UploadsService(baseConfig).sign('products', 1_700_000_000_000);
     const expected = createHash('sha1')
-      .update('folder=sanghavi-gold/products&timestamp=1700000000secret')
+      .update('allowed_formats=jpg,jpeg,png,webp,avif,heic&folder=sanghavi-gold/products&timestamp=1700000000secret')
       .digest('hex');
     expect(result).toEqual({
       uploadUrl: 'https://api.cloudinary.com/v1_1/demo/image/upload',
       apiKey: 'key123',
       timestamp: 1_700_000_000,
       folder: 'sanghavi-gold/products',
+      allowedFormats: 'jpg,jpeg,png,webp,avif,heic',
       signature: expected,
     });
     expect(JSON.stringify(result)).not.toContain('secret"');

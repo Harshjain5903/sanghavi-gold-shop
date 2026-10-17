@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { MetalRateSnapshot } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/auth-user';
+import { TtlCache } from '../common/ttl-cache';
 import { RatesPerGram } from '../pricing/price-calculator';
-import { PrismaService } from '../prisma/prisma.service';
 import { UpdateRatesDto } from './dto/update-rates.dto';
+import { RateSnapshot, RatesRepository } from './rates.repository';
 
 /** Same shape the website already uses for metal rates (₹ per gram). */
 export interface RatesView {
@@ -27,16 +27,29 @@ const EMPTY_RATES: RatesView = {
   updatedAt: '',
 };
 
+type RatesListener = () => void;
+
 @Injectable()
 export class RatesService {
+  // Rates change at most a few times a day; avoid a database read on every page view.
+  private readonly cache = new TtlCache<RatesView>(60_000);
+  private readonly listeners: RatesListener[] = [];
+
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly rates: RatesRepository,
     private readonly audit: AuditService,
   ) {}
 
-  async current(): Promise<RatesView> {
-    const latest = await this.prisma.metalRateSnapshot.findFirst({ orderBy: { createdAt: 'desc' } });
-    return latest ? this.toView(latest) : EMPTY_RATES;
+  /** Called after rates change (e.g. so the catalog can drop cached prices). */
+  onChange(listener: RatesListener): void {
+    this.listeners.push(listener);
+  }
+
+  current(): Promise<RatesView> {
+    return this.cache.get(async () => {
+      const latest = await this.rates.latest();
+      return latest ? this.toView(latest) : EMPTY_RATES;
+    });
   }
 
   async currentPerGram(): Promise<RatesPerGram> {
@@ -46,17 +59,18 @@ export class RatesService {
 
   async update(actor: AuthUser, input: UpdateRatesDto): Promise<RatesView> {
     const previous = await this.current();
-    const snapshot = await this.prisma.metalRateSnapshot.create({
-      data: {
-        gold24kPerGram: input.gold24k,
-        gold22kPerGram: input.gold22k,
-        gold18kPerGram: input.gold18k,
-        silverPerGram: input.silver,
-        goldDisplayUnit: input.goldDisplayUnit,
-        silverDisplayUnit: input.silverDisplayUnit,
-        createdByEmail: actor.email,
-      },
+    const snapshot = await this.rates.add({
+      gold24kPerGram: input.gold24k,
+      gold22kPerGram: input.gold22k,
+      gold18kPerGram: input.gold18k,
+      silverPerGram: input.silver,
+      goldDisplayUnit: input.goldDisplayUnit,
+      silverDisplayUnit: input.silverDisplayUnit,
+      createdByEmail: actor.email,
     });
+    this.cache.invalidate();
+    this.listeners.forEach((listener) => listener());
+
     const next = this.toView(snapshot);
     await this.audit.record(actor, {
       action: 'METAL_RATES_UPDATED',
@@ -67,12 +81,12 @@ export class RatesService {
     return next;
   }
 
-  private toView(snapshot: MetalRateSnapshot): RatesView {
+  private toView(snapshot: RateSnapshot): RatesView {
     return {
-      gold24k: Number(snapshot.gold24kPerGram),
-      gold22k: Number(snapshot.gold22kPerGram),
-      gold18k: Number(snapshot.gold18kPerGram),
-      silver: Number(snapshot.silverPerGram),
+      gold24k: snapshot.gold24kPerGram,
+      gold22k: snapshot.gold22kPerGram,
+      gold18k: snapshot.gold18kPerGram,
+      silver: snapshot.silverPerGram,
       goldDisplayUnit: snapshot.goldDisplayUnit,
       silverDisplayUnit: snapshot.silverDisplayUnit,
       updatedAt: snapshot.createdAt.toISOString(),

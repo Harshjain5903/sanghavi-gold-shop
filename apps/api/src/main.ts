@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { APP_CONFIG, AppConfig } from './config/env';
@@ -13,7 +14,9 @@ try {
 }
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Render sits behind a proxy; trust it so rate limits see the real client IP.
+  app.set('trust proxy', 1);
   const config = app.get<AppConfig>(APP_CONFIG);
 
   app.use(helmet());

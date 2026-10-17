@@ -9,8 +9,12 @@ export interface UploadSignature {
   apiKey: string;
   timestamp: number;
   folder: string;
+  allowedFormats: string;
   signature: string;
 }
+
+/** Only photos may be uploaded; Cloudinary rejects anything else because it is part of the signature. */
+export const ALLOWED_IMAGE_FORMATS = 'jpg,jpeg,png,webp,avif,heic';
 
 /**
  * Signs direct browser-to-Cloudinary uploads. The API secret never leaves the server;
@@ -29,13 +33,14 @@ export class UploadsService {
     const folder = `sanghavi-gold/${target}`;
     // Cloudinary signature: SHA-1 of the alphabetically sorted params, followed by the secret.
     const signature = createHash('sha1')
-      .update(`folder=${folder}&timestamp=${timestamp}${cloudinary.apiSecret}`)
+      .update(`allowed_formats=${ALLOWED_IMAGE_FORMATS}&folder=${folder}&timestamp=${timestamp}${cloudinary.apiSecret}`)
       .digest('hex');
     return {
       uploadUrl: `https://api.cloudinary.com/v1_1/${cloudinary.cloudName}/image/upload`,
       apiKey: cloudinary.apiKey,
       timestamp,
       folder,
+      allowedFormats: ALLOWED_IMAGE_FORMATS,
       signature,
     };
   }
