@@ -10,7 +10,7 @@ import {
   GoogleAuthProvider,
   type User,
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -45,18 +45,25 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       onClose();
   };
 
+  // Creates the profile on first sign-in. Never overwrites an existing profile, so signing in
+  // again (e.g. with Google) can't wipe a saved mobile number or reset the join date.
   const saveUserProfile = async (user: User, fallbackName = '', fallbackMobile = '') => {
-    const finalName = user.displayName?.trim() || fallbackName || (user.email ? user.email.split('@')[0] : 'Customer');
-    const finalMobile = fallbackMobile || user.phoneNumber || '';
-
-    await setDoc(doc(db, 'users', user.uid), {
+    const ref = doc(db, 'users', user.uid);
+    const existing = await getDoc(ref);
+    if (existing.exists()) {
+      if (fallbackMobile && !existing.data().mobile) {
+        await setDoc(ref, { mobile: fallbackMobile }, { merge: true });
+      }
+      return;
+    }
+    await setDoc(ref, {
       uid: user.uid,
-      name: finalName,
+      name: user.displayName?.trim() || fallbackName || (user.email ? user.email.split('@')[0] : 'Customer'),
       email: user.email || '',
-      mobile: finalMobile,
+      mobile: fallbackMobile || user.phoneNumber || '',
       createdAt: new Date().toISOString(),
       isGuest: false,
-    }, { merge: true });
+    });
   };
 
   const handleGoogleSignIn = async () => {
@@ -69,7 +76,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       await saveUserProfile(userCredential.user);
       resetForm();
       onSuccess();
-    } catch (err: any) {
+    } catch (caught) {
+      const err = caught as { code?: string; message?: string };
       console.error(err);
       if (err.code === 'auth/popup-closed-by-user') {
         setError('Sign-in was cancelled. Please try again.');
@@ -78,7 +86,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('Google sign-in is not enabled in Firebase. Please enable it in the Firebase console.');
       } else {
-        setError(err.message || 'Google sign-in failed. Please try again.');
+        setError('Google sign-in failed. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -111,7 +119,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
         resetForm();
         onSuccess();
         
-    } catch (err: any) {
+    } catch (caught) {
+        const err = caught as { code?: string; message?: string };
         console.error(err);
         if (err.code === 'auth/email-already-in-use') {
             setError('Email is already registered. Please login.');
@@ -120,7 +129,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
         } else if (err.code === 'auth/weak-password') {
             setError('Password should be at least 6 characters.');
         } else {
-            setError(err.message || 'Authentication failed. Please try again.');
+            setError('Sign-in failed. Please check your details and try again.');
         }
     } finally {
         setLoading(false);

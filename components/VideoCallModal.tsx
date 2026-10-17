@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Video, Calendar, ArrowRight } from 'lucide-react';
-import { SHOP_INFO } from '../constants';
+import { openWhatsApp } from '../lib/whatsapp';
 
 interface VideoCallModalProps {
   isOpen: boolean;
@@ -10,6 +10,8 @@ interface VideoCallModalProps {
 
 const VideoCallModal: React.FC<VideoCallModalProps> = ({ isOpen, onClose, productName }) => {
   const [view, setView] = useState<'options' | 'schedule'>('options');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
 
   if (!isOpen) return null;
 
@@ -17,13 +19,17 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ isOpen, onClose, produc
     const message = productName 
       ? `I want to see *${productName}* on a live video call now.`
       : `I want to book an instant video consultation.`;
-    window.open(`https://wa.me/${SHOP_INFO.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
+    openWhatsApp(message);
     onClose();
   };
 
+  // Sends the requested slot to the shop on WhatsApp; the shop confirms the time in the chat.
   const handleScheduleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Video call scheduled successfully! We will contact you shortly.');
+    const when = new Date(`${date}T${time}`).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    openWhatsApp(
+      `Hi Sanghavi Gold, I'd like to book a video call${productName ? ` to see *${productName}*` : ''}.\nPreferred time: ${when}\nPlease confirm if this works.`,
+    );
     onClose();
   };
 
@@ -71,20 +77,17 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({ isOpen, onClose, produc
              <form onSubmit={handleScheduleSubmit} className="space-y-4">
                 <h4 className="font-bold text-lg mb-4 text-left">Schedule a Call</h4>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
-                  <input type="date" required className="w-full border rounded p-2 focus:ring-1 focus:ring-brand-black" />
+                  <label htmlFor="call-date" className="block text-sm font-medium text-gray-700 mb-1">Preferred date</label>
+                  <input id="call-date" type="date" required min={new Date().toISOString().slice(0, 10)} value={date} onChange={(e) => setDate(e.target.value)} className="w-full border rounded p-2 focus:ring-1 focus:ring-brand-black" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Select Time</label>
-                  <input type="time" required className="w-full border rounded p-2 focus:ring-1 focus:ring-brand-black" />
+                  <label htmlFor="call-time" className="block text-sm font-medium text-gray-700 mb-1">Preferred time</label>
+                  <input id="call-time" type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="w-full border rounded p-2 focus:ring-1 focus:ring-brand-black" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
-                  <input type="tel" placeholder="+91" required className="w-full border rounded p-2 focus:ring-1 focus:ring-brand-black" />
-                </div>
+                <p className="text-xs text-gray-500 text-left">This opens WhatsApp with your preferred time. We'll confirm the slot in the chat.</p>
                 <div className="flex gap-2 mt-6">
                   <button type="button" onClick={() => setView('options')} className="w-1/2 py-2 border rounded hover:bg-gray-50">Back</button>
-                  <button type="submit" className="w-1/2 py-2 bg-brand-black text-white rounded hover:bg-gray-800">Confirm</button>
+                  <button type="submit" className="w-1/2 py-2 bg-brand-black text-white rounded hover:bg-gray-800">Send on WhatsApp</button>
                 </div>
              </form>
            )}

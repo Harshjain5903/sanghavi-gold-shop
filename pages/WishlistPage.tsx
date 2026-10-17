@@ -3,12 +3,15 @@ import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { Heart, Trash2, MessageCircle, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { SHOP_INFO } from '../constants';
+import { priceLabel } from '../lib/pricing';
+import { itemsMessage, openWhatsApp } from '../lib/whatsapp';
+import { usePageTitle } from '../lib/usePageTitle';
 
 const WishlistPage: React.FC = () => {
   const { wishlist, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
   const navigate = useNavigate();
+  usePageTitle('My Wishlist');
 
   if (wishlist.length === 0) {
     return (
@@ -28,15 +31,7 @@ const WishlistPage: React.FC = () => {
     );
   }
 
-  const handleShareWishlist = () => {
-    let message = "Hi Sanghavi Gold, I am interested in these items from my wishlist:\n\n";
-    wishlist.forEach((item, index) => {
-        const itemUrl = `${window.location.origin}/#/product/${item.id}`;
-        message += `${index + 1}. *${item.name}* (₹${item.price})\nLink: ${itemUrl}\n\n`;
-    });
-    message += "Are these available?";
-    window.open(`https://wa.me/${SHOP_INFO.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
-  };
+  const handleShareWishlist = () => openWhatsApp(itemsMessage(wishlist, 'inquiry', 'wishlist'));
 
   return (
     <div className="min-h-screen bg-gray-50 py-10">
@@ -57,9 +52,16 @@ const WishlistPage: React.FC = () => {
           {wishlist.map(product => (
             <div key={product.id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden group">
                <div className="relative aspect-square bg-gray-50">
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    loading="lazy"
+                    onClick={() => navigate(`/product/${product.id}`)}
+                    className="w-full h-full object-cover cursor-pointer"
+                  />
                   <button 
                     onClick={() => removeFromWishlist(product.id)}
+                    aria-label={`Remove ${product.name} from wishlist`}
                     className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full text-gray-400 hover:text-red-500 transition"
                   >
                     <Trash2 size={16} />
@@ -68,8 +70,7 @@ const WishlistPage: React.FC = () => {
                <div className="p-4">
                   <h3 className="font-bold text-gray-900 text-sm line-clamp-1">{product.name}</h3>
                   <div className="flex items-center gap-2 mt-1 mb-4">
-                     <span className="font-bold">₹{product.price.toLocaleString('en-IN')}</span>
-                     {product.originalPrice && <span className="text-xs text-gray-400 line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>}
+                     <span className="font-bold">{priceLabel(product)}</span>
                   </div>
                   <button 
                     onClick={() => { addToCart(product); removeFromWishlist(product.id); }}

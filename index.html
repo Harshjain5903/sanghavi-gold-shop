@@ -24,80 +24,9 @@
     <link rel="apple-touch-icon" sizes="192x192" href="/favicon-192x192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512x512.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              gold: {
-                50: '#FFFAE5',
-                100: '#FFF9C4',
-                200: '#FCEEA1',
-                300: '#FBC02D',
-                400: '#EAB308',
-                500: '#D4AF37', // Classic Metallic Gold
-                600: '#B8860B',
-                700: '#806000',
-                800: '#5F4600',
-                900: '#423000',
-              },
-              brand: {
-                black: '#000000', // Deep black for luxury
-                dark: '#1A1A1A',
-                light: '#F9F9F9',
-                gray: '#F5F5F5'
-              }
-            },
-            fontFamily: {
-              serif: ['"Playfair Display"', 'serif'],
-              sans: ['"Lato"', 'sans-serif'],
-            },
-            animation: {
-              'fade-in-up': 'fadeInUp 0.3s ease-out forwards',
-            },
-            keyframes: {
-              fadeInUp: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              }
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-      body {
-        font-family: 'Lato', sans-serif;
-        background-color: #ffffff;
-        overflow-x: hidden; /* Prevents horizontal scrollbar on desktop */
-      }
-      h1, h2, h3, h4, h5, h6 {
-        font-family: 'Playfair Display', serif;
-      }
-      /* Custom Scrollbar for sleek look */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px; /* Reduced height for horizontal scrollbars if they appear */
-      }
-      ::-webkit-scrollbar-track {
-        background: #f1f1f1; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #D4AF37; 
-        border-radius: 4px;
-      }
-      
-      /* Utility to hide scrollbar but keep functionality */
-      .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-      }
-      .scrollbar-hide {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
-      }
-    </style>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",

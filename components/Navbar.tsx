@@ -7,6 +7,7 @@ import { useCategories } from '../context/CategoryContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useRates } from '../context/RatesContext';
+import { formatRateByUnit, hasAnyRate } from '../lib/pricing';
 import AuthModal from './AuthModal';
 
 // Custom SG Logo Component using the provided image
@@ -129,7 +130,7 @@ const Navbar: React.FC = () => {
   };
 
   const handleNavigation = (category: string, subcategory?: string) => {
-    navigate(`/collections?category=${category}${subcategory ? `&subcategory=${subcategory}` : ''}`);
+    navigate(`/collections?category=${encodeURIComponent(category)}${subcategory ? `&subcategory=${encodeURIComponent(subcategory)}` : ''}`);
     setIsOpen(false);
     setActiveMenu(null);
     setMobileSubMenu(null);
@@ -200,13 +201,7 @@ const Navbar: React.FC = () => {
     setIsOpen(false); // Close mobile menu if open
   };
 
-    const hasRates = rates.gold22k > 0 || rates.gold24k > 0 || rates.gold18k > 0 || rates.silver > 0;
-    const formatByUnit = (value: number, unit: '1g' | '10g' | '100g' | '1kg') => {
-        if (!value || value <= 0) return '--';
-        const multiplier = unit === '10g' ? 10 : unit === '100g' ? 100 : unit === '1kg' ? 1000 : 1;
-        const label = unit === '1kg' ? 'kg' : unit;
-        return `₹${(value * multiplier).toLocaleString('en-IN')}/${label}`;
-    };
+    const hasRates = hasAnyRate(rates);
 
   return (
     <>
@@ -236,12 +231,12 @@ const Navbar: React.FC = () => {
                                     </select>
                                     <span>:</span>
                                     <span>
-                                        {goldPurity === 'gold24k' && formatByUnit(rates.gold24k, rates.goldDisplayUnit || '10g')}
-                                        {goldPurity === 'gold22k' && formatByUnit(rates.gold22k, rates.goldDisplayUnit || '10g')}
-                                        {goldPurity === 'gold18k' && formatByUnit(rates.gold18k, rates.goldDisplayUnit || '10g')}
+                                        {goldPurity === 'gold24k' && formatRateByUnit(rates.gold24k, rates.goldDisplayUnit || '10g')}
+                                        {goldPurity === 'gold22k' && formatRateByUnit(rates.gold22k, rates.goldDisplayUnit || '10g')}
+                                        {goldPurity === 'gold18k' && formatRateByUnit(rates.gold18k, rates.goldDisplayUnit || '10g')}
                                     </span>
                                 </div>
-                                <span>Silver: {formatByUnit(rates.silver, rates.silverDisplayUnit || '1kg')}</span>
+                                <span>Silver: {formatRateByUnit(rates.silver, rates.silverDisplayUnit || '1kg')}</span>
                             </div>
                         )}
             </div>

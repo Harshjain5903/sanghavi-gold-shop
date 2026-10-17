@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { removeKey } from '../lib/storage';
 
 export interface UserProfile {
   uid?: string;
@@ -75,96 +76,61 @@ const normalizeProfile = (profile: Partial<UserProfile>): UserProfile => {
   };
 };
 
-const getStoredUser = (): UserProfile | null => {
-  try {
-    const raw = localStorage.getItem(USER_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as UserProfile;
-    return normalizeProfile({
-      uid: parsed.uid,
-      name: parsed.name,
-      email: parsed.email,
-      mobile: parsed.mobile,
-    });
-  } catch {
-    return null;
-  }
-};
-
-const saveStoredUser = (profile: UserProfile | null) => {
-  if (!profile) {
-    localStorage.removeItem(USER_STORAGE_KEY);
-    return;
-  }
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile));
-};
+// Older versions cached the profile (name, email, phone) in localStorage. Remove that copy.
+const clearLegacyStoredUser = () => removeKey(USER_STORAGE_KEY);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(() => getStoredUser());
+  // Signed-out until Firebase confirms the session, so the UI never shows a stale "logged in" state.
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    clearLegacyStoredUser();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const storedUser = getStoredUser();
-
-          // Fetch extra profile details from Firestore
-          const docRef = doc(db, 'users', firebaseUser.uid);
-          const docSnap = await getDoc(docRef);
-
-          const fallbackProfile = normalizeProfile({
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName || storedUser?.name || '',
-            email: firebaseUser.email || storedUser?.email || '',
-            mobile: firebaseUser.phoneNumber || storedUser?.mobile || '',
-          });
-          
-          if (docSnap.exists()) {
-             const data = docSnap.data() as Record<string, unknown>;
-             const profile = normalizeProfile({
-               ...fallbackProfile,
-               ...(data as Partial<UserProfile>),
-               mobile: String(data.mobile || data.phone || data.phoneNumber || fallbackProfile.mobile || ''),
-               uid: firebaseUser.uid,
-             });
-             setUser(profile);
-             saveStoredUser(profile);
-
-             // Keep Firestore profile clean for future sessions.
-             const needsRepair =
-               data.name !== profile.name ||
-               String(data.mobile || data.phone || data.phoneNumber || '') !== profile.mobile ||
-               data.email !== profile.email;
-
-             if (needsRepair) {
-               await setDoc(docRef, {
-                 name: profile.name,
-                 mobile: profile.mobile,
-                 email: profile.email,
-                 isGuest: false,
-               }, { merge: true });
-             }
-          } else {
-             // Fallback for users created without profile doc (shouldn't happen with our modal)
-             setUser(fallbackProfile);
-             saveStoredUser(fallbackProfile);
-
-             await setDoc(docRef, {
-               name: fallbackProfile.name,
-               mobile: fallbackProfile.mobile,
-               email: fallbackProfile.email,
-               isGuest: false,
-             }, { merge: true });
-          }
-        } catch (e) {
-            console.error("Error fetching user profile", e);
-        }
-      } else {
+      if (!firebaseUser) {
         setUser(null);
-        saveStoredUser(null);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+
+      const fromAccount = normalizeProfile({
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName || '',
+        email: firebaseUser.email || '',
+        mobile: firebaseUser.phoneNumber || '',
+      });
+
+      try {
+        const docRef = doc(db, 'users', firebaseUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data() as Record<string, unknown>;
+          setUser(
+            normalizeProfile({
+              uid: firebaseUser.uid,
+              name: String(data.name || fromAccount.name),
+              email: fromAccount.email || String(data.email || ''),
+              mobile: String(data.mobile || data.phone || data.phoneNumber || fromAccount.mobile || ''),
+            }),
+          );
+        } else {
+          // First sign-in without a profile document: create it once.
+          setUser(fromAccount);
+          await setDoc(docRef, {
+            uid: firebaseUser.uid,
+            name: fromAccount.name,
+            email: fromAccount.email,
+            mobile: fromAccount.mobile,
+            createdAt: new Date().toISOString(),
+            isGuest: false,
+          });
+        }
+      } catch (e) {
+        console.error('Error loading user profile', e);
+        setUser(fromAccount);
+      } finally {
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
@@ -172,20 +138,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (changes: Partial<UserProfile>) => {
     if (!auth.currentUser) return;
-    // Only user-editable fields; firestore.rules rejects anything else.
+    // Only name and mobile are editable here; the email is the sign-in email and comes from Firebase.
     const data: Partial<UserProfile> = {};
-    if (changes.name !== undefined) data.name = changes.name;
-    if (changes.email !== undefined) data.email = changes.email;
-    if (changes.mobile !== undefined) data.mobile = changes.mobile;
+    if (changes.name !== undefined) data.name = changes.name.trim().slice(0, 100);
+    if (changes.mobile !== undefined) data.mobile = normalizeMobile(changes.mobile).slice(0, 15);
     try {
         const userRef = doc(db, 'users', auth.currentUser.uid);
         await setDoc(userRef, data, { merge: true });
-        setUser(prev => {
-          if (!prev) return null;
-          const updated = normalizeProfile({ ...prev, ...data });
-          saveStoredUser(updated);
-          return updated;
-        });
+        setUser(prev => (prev ? normalizeProfile({ ...prev, ...data }) : null));
     } catch (e) {
         console.error("Error updating profile", e);
         throw e;
@@ -195,7 +155,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     await signOut(auth);
     setUser(null);
-    saveStoredUser(null);
   };
 
   return (

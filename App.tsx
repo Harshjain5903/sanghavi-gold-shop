@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { HashRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Hero from './components/Hero';
@@ -8,10 +8,17 @@ import ProductCard from './components/ProductCard';
 import ProductDetailsPage from './pages/ProductDetailsPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
-import AdminPage from './pages/AdminPage';
 import ProfilePage from './pages/ProfilePage';
 import WishlistPage from './pages/WishlistPage';
 import StoreShowcase from './components/StoreShowcase';
+import InfoPage from './pages/InfoPage';
+import NotFoundPage from './pages/NotFoundPage';
+import ErrorBoundary from './components/ui/ErrorBoundary';
+import Toaster from './components/ui/Toaster';
+import { usePageTitle } from './lib/usePageTitle';
+
+// The admin panel is large and only staff need it: load it only when /admin is opened.
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 import { TRUST_FEATURES } from './constants';
 import { Category, Product } from './types';
 import { ArrowRight, Filter, ChevronDown, X, ArrowUpDown, Check, Search, Sparkles, Frown } from 'lucide-react';
@@ -47,6 +54,7 @@ const RELATED_CATEGORIES: Record<string, string[]> = {
 // --- Page Components ---
 
 const HomePage = () => {
+  usePageTitle();
   const { products } = useProducts();
   const { categories } = useCategories();
   const navigate = useNavigate();
@@ -63,7 +71,7 @@ const HomePage = () => {
            {categories.map((item, idx) => (
              <div 
                key={idx} 
-               onClick={() => navigate(`/collections?category=${item.category}`)}
+               onClick={() => navigate(`/collections?category=${encodeURIComponent(item.category)}`)}
                className="flex flex-col items-center gap-2 cursor-pointer group w-[72px] flex-shrink-0"
              >
                 <div className="w-[72px] h-[72px] rounded-2xl p-[2px] border border-gray-100 group-hover:border-gold-500 transition-all overflow-hidden bg-gray-50 shadow-sm relative">
@@ -166,7 +174,7 @@ const HomePage = () => {
                         desc: 'Bangles, Kadas & More'
                     }
                 ].map((cat, idx) => (
-                    <Link to={`/collections?category=${cat.link}`} key={idx} className="group relative h-64 md:h-[400px] overflow-hidden rounded-2xl shadow-xl cursor-pointer bg-gray-200">
+                    <Link to={`/collections?category=${encodeURIComponent(cat.link)}`} key={idx} className="group relative h-64 md:h-[400px] overflow-hidden rounded-2xl shadow-xl cursor-pointer bg-gray-200">
                         <img 
                             src={cat.img} 
                             alt={cat.name} 
@@ -251,6 +259,7 @@ const CollectionsPage = () => {
     const subcategoryParam = searchParams.get('subcategory');
     const searchQuery = searchParams.get('search');
 
+    usePageTitle(searchQuery ? `Search: ${searchQuery}` : subcategoryParam || categoryParam || 'All Jewellery');
     const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
     const [isMobileSortOpen, setIsMobileSortOpen] = useState(false);
@@ -455,7 +464,7 @@ const CollectionsPage = () => {
                 // FIX: Enhanced Case-Insensitive and Partial Matching
                 // This solves the issue where "Men's Silver Jewellery" (URL) didn't match "Men's Silver Jewellery" (Product)
                 // due to encoding or slight variations.
-                const decodedParam = decodeURIComponent(categoryParam).toLowerCase().trim();
+                const decodedParam = categoryParam.toLowerCase().trim();
                 
                 result = result.filter(p => 
                     p.category.some(c => {
@@ -470,7 +479,7 @@ const CollectionsPage = () => {
                 );
             }
             if (subcategoryParam) {
-                const decodedSubParam = decodeURIComponent(subcategoryParam).toLowerCase().trim();
+                const decodedSubParam = subcategoryParam.toLowerCase().trim();
                 result = result.filter(p => {
                     const pSub = (p.subcategory || '').toLowerCase().trim();
                     const catMatch = p.category.some(c => {
@@ -523,7 +532,7 @@ const CollectionsPage = () => {
             <div className="bg-brand-light border-b border-gray-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                     <div className="text-xs text-gray-500 mb-2">
-                        Home / {searchQuery ? `Search` : (categoryParam ? decodeURIComponent(categoryParam) : 'All Jewellery')} {subcategoryParam && `/ ${subcategoryParam}`}
+                        Home / {searchQuery ? `Search` : (categoryParam ? categoryParam : 'All Jewellery')} {subcategoryParam && `/ ${subcategoryParam}`}
                     </div>
                     
                     <div className="flex flex-col md:flex-row justify-between md:items-end gap-2">
@@ -560,7 +569,7 @@ const CollectionsPage = () => {
                                 </>
                              ) : (
                                 <h1 className="text-xl md:text-2xl font-serif font-bold text-gray-900">
-                                    {subcategoryParam || (categoryParam ? decodeURIComponent(categoryParam) : 'All Collections')}
+                                    {subcategoryParam || (categoryParam ? categoryParam : 'All Collections')}
                                 </h1>
                              )}
                         </div>
@@ -744,26 +753,44 @@ const CollectionsPage = () => {
     );
 };
 
+const PageLoading = () => (
+  <div className="min-h-[60vh] flex items-center justify-center text-gray-500">Loading…</div>
+);
+
 const App: React.FC = () => {
   return (
     <Router>
       <ScrollToTop />
+      <Toaster />
       <div className="flex flex-col min-h-screen">
         <Routes>
-          <Route path="/admin" element={<AdminPage />} />
+          <Route
+            path="/admin"
+            element={
+              <ErrorBoundary>
+                <Suspense fallback={<PageLoading />}>
+                  <AdminPage />
+                </Suspense>
+              </ErrorBoundary>
+            }
+          />
           <Route path="*" element={
             <>
               <Navbar />
               <main className="flex-grow">
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/collections" element={<CollectionsPage />} />
-                  <Route path="/product/:id" element={<ProductDetailsPage />} />
-                  <Route path="/cart" element={<CartPage />} />
-                  <Route path="/checkout" element={<CheckoutPage />} />
-                  <Route path="/wishlist" element={<WishlistPage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
-                </Routes>
+                <ErrorBoundary>
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/collections" element={<CollectionsPage />} />
+                    <Route path="/product/:id" element={<ProductDetailsPage />} />
+                    <Route path="/cart" element={<CartPage />} />
+                    <Route path="/checkout" element={<CheckoutPage />} />
+                    <Route path="/wishlist" element={<WishlistPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/info/:slug" element={<InfoPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Routes>
+                </ErrorBoundary>
               </main>
               <Footer />
               <FloatingWhatsApp />

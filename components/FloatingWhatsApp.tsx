@@ -1,10 +1,10 @@
 import React from 'react';
-import { SHOP_INFO } from '../constants';
+import { whatsappUrl } from '../lib/whatsapp';
 
 const FloatingWhatsApp: React.FC = () => {
   return (
     <a
-      href={`https://wa.me/${SHOP_INFO.whatsapp}?text=Hi, I saw your website and want to know more.`}
+      href={whatsappUrl('Hi, I saw your website and want to know more.')}
       target="_blank"
       rel="noreferrer"
       className="fixed bottom-6 right-6 z-40 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:bg-[#128C7E] transition-all duration-300 flex items-center gap-2 animate-bounce hover:animate-none"

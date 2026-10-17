@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './index.css';
 import { CartProvider } from './context/CartContext';
 import { ProductProvider } from './context/ProductContext';
 import { AuthProvider } from './context/AuthContext';
@@ -9,6 +10,11 @@ import { SortOptionsProvider } from './context/SortOptionsContext';
 import { FilterOptionsProvider } from './context/FilterOptionsContext';
 import { RatesProvider } from './context/RatesContext';
 import { WishlistProvider } from './context/WishlistContext';
+
+// Old links used "#/" URLs (e.g. /#/product/123, shared on WhatsApp). Turn them into clean URLs.
+if (window.location.hash.startsWith('#/')) {
+  window.history.replaceState(null, '', window.location.hash.slice(1));
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

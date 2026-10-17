@@ -2,20 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { User, Phone, Mail, LogOut, Package, Edit2, Save, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { notify } from '../components/ui/Toaster';
+import { usePageTitle } from '../lib/usePageTitle';
 
 const ProfilePage: React.FC = () => {
   const { user, logout, updateProfile, loading } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || '',
-    email: user?.email || ''
+    mobile: user?.mobile || ''
   });
+  usePageTitle('My Account');
 
   useEffect(() => {
     setFormData({
       name: user?.name || '',
-      email: user?.email || ''
+      mobile: user?.mobile || ''
     });
   }, [user]);
 
@@ -40,8 +44,24 @@ const ProfilePage: React.FC = () => {
   }
 
   const handleSave = async () => {
-    await updateProfile({ name: formData.name, email: formData.email });
-    setIsEditing(false);
+    if (!formData.name.trim()) {
+      notify('Please enter your name.', 'error');
+      return;
+    }
+    if (formData.mobile && !/^\d{10}$/.test(formData.mobile)) {
+      notify('Please enter a 10-digit mobile number.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateProfile({ name: formData.name, mobile: formData.mobile });
+      setIsEditing(false);
+      notify('Profile saved.', 'success');
+    } catch {
+      notify('Could not save your profile. Please try again.', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -64,11 +84,11 @@ const ProfilePage: React.FC = () => {
                     <User size={32} />
                  </div>
                  {!isEditing ? (
-                   <button onClick={() => setIsEditing(true)} className="text-gray-400 hover:text-brand-black"><Edit2 size={18}/></button>
+                   <button onClick={() => setIsEditing(true)} aria-label="Edit profile" className="text-gray-400 hover:text-brand-black"><Edit2 size={18}/></button>
                  ) : (
                    <div className="flex gap-2">
-                     <button onClick={() => setIsEditing(false)} className="text-red-400 hover:text-red-600"><X size={18}/></button>
-                     <button onClick={handleSave} className="text-green-600 hover:text-green-700"><Save size={18}/></button>
+                     <button onClick={() => setIsEditing(false)} aria-label="Cancel editing" className="text-red-400 hover:text-red-600"><X size={18}/></button>
+                     <button onClick={handleSave} disabled={saving} aria-label="Save profile" className="text-green-600 hover:text-green-700 disabled:opacity-50"><Save size={18}/></button>
                    </div>
                  )}
                </div>
@@ -90,21 +110,25 @@ const ProfilePage: React.FC = () => {
                  
                  <div>
                    <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1"><Phone size={10} /> Mobile</label>
-                   <p className="font-medium text-gray-700">{user.mobile || 'Not Provided'}</p>
+                   {isEditing ? (
+                     <input
+                       type="tel"
+                       inputMode="numeric"
+                       maxLength={10}
+                       value={formData.mobile}
+                       onChange={(e) => setFormData({...formData, mobile: e.target.value.replace(/\D/g, '')})}
+                       className="w-full border-b border-gold-500 focus:outline-none py-1 font-medium text-gray-700"
+                       placeholder="10-digit mobile number"
+                     />
+                   ) : (
+                     <p className="font-medium text-gray-700">{user.mobile || 'Not Provided'}</p>
+                   )}
                  </div>
 
                  <div>
                    <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1"><Mail size={10} /> Email</label>
-                   {isEditing ? (
-                     <input 
-                       type="email" 
-                       value={formData.email} 
-                       onChange={(e) => setFormData({...formData, email: e.target.value})}
-                       className="w-full border-b border-gold-500 focus:outline-none py-1 font-medium text-gray-700"
-                     />
-                   ) : (
-                     <p className="font-medium text-gray-700">{user.email || 'Not Provided'}</p>
-                   )}
+                   {/* The sign-in email can't be changed here. */}
+                   <p className="font-medium text-gray-700">{user.email || 'Not Provided'}</p>
                  </div>
                </div>
 

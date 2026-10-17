@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Product } from '../types';
 import { useAuth } from './AuthContext';
+import { useProducts } from './ProductContext';
+import { readJson, removeKey, writeJson } from '../lib/storage';
 
 interface WishlistContextType {
+  /** Wishlisted products with live data (price, stock) from the catalog. */
   wishlist: Product[];
   addToWishlist: (product: Product) => void;
   removeFromWishlist: (productId: string) => void;
@@ -14,84 +17,65 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 const GUEST_WISHLIST_KEY = 'sanghavi_wishlist_guest';
 const LEGACY_WISHLIST_KEY = 'sanghavi_wishlist';
 
-const readWishlistFromStorage = (key: string): Product[] => {
-  const saved = localStorage.getItem(key);
-  if (!saved) return [];
-  try {
-    const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+// Stores only product ids. Older versions stored whole products; keep just their ids.
+const readIds = (key: string): string[] => {
+  const saved = readJson<unknown>(key, []);
+  if (!Array.isArray(saved)) return [];
+  return saved
+    .map((entry) => (typeof entry === 'string' ? entry : entry && typeof entry === 'object' ? String((entry as Product).id ?? '') : ''))
+    .filter(Boolean);
 };
 
-const migrateLegacyGuestWishlist = () => {
-  const alreadyMigrated = localStorage.getItem(GUEST_WISHLIST_KEY);
-  if (alreadyMigrated) return;
-  const legacy = localStorage.getItem(LEGACY_WISHLIST_KEY);
-  if (!legacy) return;
-  localStorage.setItem(GUEST_WISHLIST_KEY, legacy);
-  localStorage.removeItem(LEGACY_WISHLIST_KEY);
-};
-
-const mergeWishlist = (base: Product[], incoming: Product[]): Product[] => {
-  const map = new Map<string, Product>();
-  base.forEach(item => map.set(item.id, item));
-  incoming.forEach(item => {
-    if (!map.has(item.id)) map.set(item.id, item);
-  });
-  return Array.from(map.values());
-};
+const unique = (ids: string[]) => [...new Set(ids)];
 
 export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
-  const [wishlist, setWishlist] = useState<Product[]>([]);
+  const { user, loading: authLoading } = useAuth();
+  const { products, loading: productsLoading } = useProducts();
+  const [ids, setIds] = useState<string[]>([]);
   const [storageKey, setStorageKey] = useState<string | null>(null);
 
-  // Load account-scoped wishlist. Migrate guest wishlist to user wishlist on first login.
   useEffect(() => {
-    if (loading) return;
-
-    migrateLegacyGuestWishlist();
-
-    const nextKey = user?.uid ? `sanghavi_wishlist_${user.uid}` : GUEST_WISHLIST_KEY;
-    const scopedWishlist = readWishlistFromStorage(nextKey);
-
-    if (user?.uid) {
-      const guestWishlist = readWishlistFromStorage(GUEST_WISHLIST_KEY);
-      const merged = mergeWishlist(scopedWishlist, guestWishlist);
-      if (guestWishlist.length > 0) {
-        localStorage.removeItem(GUEST_WISHLIST_KEY);
-      }
-      setWishlist(merged);
-      setStorageKey(nextKey);
-      return;
+    if (authLoading) return;
+    const legacy = readIds(LEGACY_WISHLIST_KEY);
+    if (legacy.length) {
+      writeJson(GUEST_WISHLIST_KEY, unique([...readIds(GUEST_WISHLIST_KEY), ...legacy]));
+      removeKey(LEGACY_WISHLIST_KEY);
     }
 
-    setWishlist(scopedWishlist);
-    setStorageKey(nextKey);
-  }, [user?.uid, loading]);
+    const key = user?.uid ? `sanghavi_wishlist_${user.uid}` : GUEST_WISHLIST_KEY;
+    let next = readIds(key);
+    if (user?.uid) {
+      const guest = readIds(GUEST_WISHLIST_KEY);
+      if (guest.length) {
+        next = unique([...next, ...guest]);
+        removeKey(GUEST_WISHLIST_KEY);
+      }
+    }
+    setIds(next);
+    setStorageKey(key);
+  }, [user?.uid, authLoading]);
 
-  // Save wishlist to the active scope key.
   useEffect(() => {
-    if (!storageKey) return;
-    localStorage.setItem(storageKey, JSON.stringify(wishlist));
-  }, [wishlist, storageKey]);
+    if (storageKey) writeJson(storageKey, ids);
+  }, [ids, storageKey]);
 
-  const addToWishlist = (product: Product) => {
-    setWishlist(prev => {
-      if (prev.find(p => p.id === product.id)) return prev;
-      return [...prev, product];
+  useEffect(() => {
+    if (productsLoading || products.length === 0) return;
+    const known = new Set(products.map((p) => p.id));
+    setIds((prev) => (prev.every((id) => known.has(id)) ? prev : prev.filter((id) => known.has(id))));
+  }, [products, productsLoading]);
+
+  const wishlist = useMemo(() => {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    return ids.flatMap((id) => {
+      const product = byId.get(id);
+      return product ? [product] : [];
     });
-  };
+  }, [ids, products]);
 
-  const removeFromWishlist = (productId: string) => {
-    setWishlist(prev => prev.filter(p => p.id !== productId));
-  };
-
-  const isInWishlist = (productId: string) => {
-    return wishlist.some(p => p.id === productId);
-  };
+  const addToWishlist = (product: Product) => setIds((prev) => unique([...prev, product.id]));
+  const removeFromWishlist = (productId: string) => setIds((prev) => prev.filter((id) => id !== productId));
+  const isInWishlist = (productId: string) => ids.includes(productId);
 
   return (
     <WishlistContext.Provider value={{ wishlist, addToWishlist, removeFromWishlist, isInWishlist, wishlistCount: wishlist.length }}>

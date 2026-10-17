@@ -2,10 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
-import { Star, Truck, ShieldCheck, RefreshCw, Video, MessageCircle, AlertCircle, ShoppingBag, Scale, Gem, ScrollText, Ruler, Sparkles, ArrowRight } from 'lucide-react';
+import { Truck, ShieldCheck, RefreshCw, Video, MessageCircle, AlertCircle, ShoppingBag, Scale, Gem, ScrollText, Ruler, Sparkles, ArrowRight } from 'lucide-react';
 import VideoCallModal from '../components/VideoCallModal';
 import ProductCard from '../components/ProductCard';
-import { SHOP_INFO } from '../constants';
+import { notify } from '../components/ui/Toaster';
+import { openWhatsApp, productInquiryMessage, productUrl } from '../lib/whatsapp';
+import { formatRupees } from '../lib/pricing';
+import { usePageTitle } from '../lib/usePageTitle';
 
 const ProductDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,9 +18,9 @@ const ProductDetailsPage: React.FC = () => {
   
   // Fetch current product
   const product = getProductById(id || '');
+  usePageTitle(product?.name);
 
   const [pincode, setPincode] = useState('');
-  const [deliveryDate, setDeliveryDate] = useState<string | null>(null);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   
   // Image Gallery State
@@ -82,18 +85,16 @@ const ProductDetailsPage: React.FC = () => {
       : [product.image];
 
   const handlePincodeCheck = () => {
-    if (pincode.length === 6) {
-      setDeliveryDate('Available in your area');
-    } else {
-      alert('Please enter a valid 6-digit pincode');
+    if (!/^\d{6}$/.test(pincode)) {
+      notify('Please enter a valid 6-digit pincode.', 'error');
+      return;
     }
+    openWhatsApp(
+      `Hi Sanghavi Gold, can you deliver *${product.name}* to pincode ${pincode}? What would the delivery time be?\nLink: ${productUrl(product.id)}`,
+    );
   };
 
-  const handleInquire = () => {
-    const currentUrl = window.location.href;
-    const message = `Hi Sanghavi Gold, I'm interested in this product: *${product.name}* (Code: ${product.id}). \n\nHere is the link: ${currentUrl}\n\nCan you please share the price and details?`;
-    window.open(`https://wa.me/${SHOP_INFO.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
-  };
+  const handleInquire = () => openWhatsApp(productInquiryMessage(product));
 
   const handleAddToBag = () => {
       addToCart(product);
@@ -156,20 +157,15 @@ const ProductDetailsPage: React.FC = () => {
             <div className="border-b pb-6">
               <h1 className="text-2xl md:text-3xl font-serif font-bold text-gray-900 mb-2">{product.name}</h1>
               
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex bg-green-700 text-white px-2 py-0.5 rounded text-xs font-bold items-center gap-1">
-                  4.9 <Star size={10} fill="currentColor" />
-                </div>
-                <span className="text-sm text-gray-500 underline cursor-pointer">21 Ratings & Reviews</span>
-              </div>
+              {product.purity && <p className="text-sm text-gray-500 mb-4">{product.purity}</p>}
 
                 {showPrice ? (
                   <>
                     <div className="flex items-end gap-3 mb-2">
-                        <span className="text-3xl font-bold text-brand-black">₹{product.price.toLocaleString('en-IN')}</span>
+                        <span className="text-3xl font-bold text-brand-black">{formatRupees(product.price)}</span>
                         {product.originalPrice && (
                             <>
-                            <span className="text-lg text-gray-400 line-through">₹{product.originalPrice.toLocaleString('en-IN')}</span>
+                            <span className="text-lg text-gray-400 line-through">{formatRupees(product.originalPrice)}</span>
                             <span className="text-lg text-red-600 font-bold">({discount}% OFF)</span>
                             </>
                         )}
@@ -249,21 +245,24 @@ const ProductDetailsPage: React.FC = () => {
                 </button>
             </div>
 
-            {/* Delivery Checker */}
+            {/* Delivery question: sent to the shop on WhatsApp (no automatic courier check yet) */}
             <div className="bg-gray-50 p-4 rounded-lg mb-6 mt-6">
-               <h4 className="font-bold text-sm mb-2 flex items-center gap-2"><Truck size={16} /> Availability Check</h4>
+               <h4 className="font-bold text-sm mb-2 flex items-center gap-2"><Truck size={16} /> Delivery to your area</h4>
                <div className="flex gap-2">
+                 <label htmlFor="delivery-pincode" className="sr-only">Pincode</label>
                  <input 
+                   id="delivery-pincode"
                    type="text" 
+                   inputMode="numeric"
                    placeholder="Enter Pincode" 
                    value={pincode}
-                   onChange={(e) => setPincode(e.target.value)}
+                   onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
                    className="border rounded px-3 py-2 w-full text-sm focus:outline-none focus:border-brand-black"
                    maxLength={6}
                  />
-                 <button onClick={handlePincodeCheck} className="text-sm font-bold text-brand-black underline">Check</button>
+                 <button onClick={handlePincodeCheck} className="text-sm font-bold text-brand-black underline whitespace-nowrap">Ask us</button>
                </div>
-               {deliveryDate && <p className="text-green-700 text-xs font-bold mt-2">{deliveryDate}</p>}
+               <p className="text-xs text-gray-500 mt-2">We'll reply on WhatsApp with delivery options and timing.</p>
             </div>
 
             {/* --- PREMIUM SPECIFICATIONS CARD --- */}

@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { Trash2, ArrowRight, ShieldCheck, ShoppingBag, Video, MessageCircle, Square, CheckSquare, Plus, Minus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { SHOP_INFO } from '../constants';
+import { formatRupees, isPricedProduct, priceLabel } from '../lib/pricing';
+import { itemsMessage, openWhatsApp } from '../lib/whatsapp';
+import { notify } from '../components/ui/Toaster';
+import { usePageTitle } from '../lib/usePageTitle';
 
 const CartPage: React.FC = () => {
   const { items, removeFromCart, updateQuantity, cartTotal, cartCount } = useCart();
@@ -11,12 +14,17 @@ const CartPage: React.FC = () => {
   // Selection State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Select all items by default on load
+  usePageTitle('Shopping Bag');
+
+  // New items start selected; removed items drop out. Changing a quantity keeps the current selection.
+  const [knownIds, setKnownIds] = useState<string[]>([]);
   useEffect(() => {
-    if (items.length > 0) {
-      setSelectedIds(items.map(i => i.id));
-    }
-  }, [items]);
+    const currentIds = items.map(i => i.id);
+    const added = currentIds.filter(id => !knownIds.includes(id));
+    if (added.length === 0 && currentIds.length === knownIds.length) return;
+    setSelectedIds(prev => [...prev.filter(id => currentIds.includes(id)), ...added]);
+    setKnownIds(currentIds);
+  }, [items, knownIds]);
 
   const toggleSelection = (id: string) => {
     if (selectedIds.includes(id)) {
@@ -57,73 +65,17 @@ const CartPage: React.FC = () => {
     navigate('/checkout');
   };
 
-  const isPricedItem = (item: (typeof items)[number]) => {
-    const displayMode = item.cardDisplayMode || 'price';
-    const isPriceOnRequest = item.priceOnRequest === true;
-    const hasPrice = item.price && item.price > 0;
-    return displayMode === 'price' && hasPrice && !isPriceOnRequest;
-  };
-
-  const getItemPriceLabel = (item: (typeof items)[number]) => {
-    const displayMode = item.cardDisplayMode || 'price';
-    const isPriceOnRequest = item.priceOnRequest === true;
-    const hasPrice = item.price && item.price > 0;
-    const showWeight = displayMode === 'weight' && item.weight && item.weight.trim().length > 0;
-
-    if (displayMode === 'price' && hasPrice && !isPriceOnRequest) {
-      return `₹${item.price.toLocaleString('en-IN')}`;
-    }
-    if (showWeight) {
-      return `Wt: ${item.weight}`;
-    }
-    return 'Price on request';
-  };
-
-  const pricedItemCount = items.reduce((count, item) => count + (isPricedItem(item) ? item.quantity : 0), 0);
-  const unpricedItemCount = items.reduce((count, item) => count + (!isPricedItem(item) ? item.quantity : 0), 0);
+  const pricedItemCount = items.reduce((count, item) => count + (isPricedProduct(item) ? item.quantity : 0), 0);
+  const unpricedItemCount = items.reduce((count, item) => count + (!isPricedProduct(item) ? item.quantity : 0), 0);
   const hasUnpricedItems = unpricedItemCount > 0;
 
-  // Generate WhatsApp Message
   const generateMessage = (action: 'inquiry' | 'video') => {
-    const targetIds = selectedIds.length > 0 ? selectedIds : items.map(i => i.id); // Default to all if none selected, or strict selection
-    const targetItems = items.filter(i => targetIds.includes(i.id));
-
+    const targetItems = items.filter(i => selectedIds.includes(i.id));
     if (targetItems.length === 0) {
-        alert("Please select at least one item.");
-        return;
+      notify('Please select at least one item.', 'error');
+      return;
     }
-
-    let message = `Hi Sanghavi Gold, I would like to ${action === 'video' ? 'request a VIDEO CALL' : 'INQUIRE'} about the following items from my bag:\n\n`;
-    
-    targetItems.forEach((item, index) => {
-        const itemUrl = `${window.location.origin}/#/product/${item.id}`;
-        message += `${index + 1}. *${item.name}*\n`;
-        message += `   Code: ${item.id}\n`;
-        message += `   Qty: ${item.quantity}\n`;
-        if (isPricedItem(item)) {
-          message += `   Price: ₹${item.price.toLocaleString('en-IN')}\n`;
-        } else {
-          message += '   Price: On request\n';
-        }
-        if(item.weight) message += `   Weight: ${item.weight}\n`;
-        if(item.purity) message += `   Purity: ${item.purity}\n`;
-        message += `   Link: ${itemUrl}\n\n`;
-    });
-
-      const totalVal = targetItems.reduce((acc, curr) => acc + (isPricedItem(curr) ? (curr.price * curr.quantity) : 0), 0);
-      if (totalVal > 0) {
-        message += `Total Selected Value (priced items): ₹${totalVal.toLocaleString('en-IN')}\n\n`;
-      } else {
-        message += 'Total Selected Value: Price on request\n\n';
-      }
-    
-    if (action === 'video') {
-        message += "Please let me know when we can connect for a live viewing.";
-    } else {
-        message += "Can you please confirm availability?";
-    }
-
-    window.open(`https://wa.me/${SHOP_INFO.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
+    openWhatsApp(itemsMessage(targetItems, action, 'bag'));
   };
 
   const activeSelectionCount = selectedIds.length;
@@ -163,7 +115,7 @@ const CartPage: React.FC = () => {
                     </button>
 
                     <div className="w-24 h-24 flex-shrink-0 bg-gray-50 rounded-lg overflow-hidden border border-gray-100">
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        <img src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover" />
                     </div>
                     
                     <div className="flex-grow">
@@ -178,12 +130,15 @@ const CartPage: React.FC = () => {
                             {/* Price Block */}
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <p className="font-bold text-lg">{getItemPriceLabel(item)}</p>
-                                    {item.originalPrice && <p className="text-xs text-gray-400 line-through">₹{item.originalPrice.toLocaleString('en-IN')}</p>}
+                                    <p className="font-bold text-lg">{priceLabel(item)}</p>
                                 </div>
-                                <p className="text-[10px] text-green-700 font-bold flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> In Stock
-                                </p>
+                                {item.inStock === false ? (
+                                  <p className="text-[10px] text-red-600 font-bold">Sold out: ask us about similar designs</p>
+                                ) : (
+                                  <p className="text-[10px] text-green-700 font-bold flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> In Store
+                                  </p>
+                                )}
                             </div>
 
                             {/* Quantity Control (Updated High Contrast) */}
@@ -273,11 +228,7 @@ const CartPage: React.FC = () => {
                   <div className="space-y-3 mb-6 text-sm">
                     <div className="flex justify-between text-gray-600">
                         <span>Subtotal (priced items{pricedItemCount > 0 ? `: ${pricedItemCount}` : ''})</span>
-                        <span className="font-bold text-gray-900">{pricedItemCount > 0 ? `₹${cartTotal.toLocaleString('en-IN')}` : 'Price on request'}</span>
-                    </div>
-                    <div className="flex justify-between text-gray-600">
-                        <span>Discount</span>
-                        <span className="text-green-600">- ₹0</span>
+                        <span className="font-bold text-gray-900">{pricedItemCount > 0 ? formatRupees(cartTotal) : 'Price on request'}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
                         <span>Shipping</span>
@@ -288,7 +239,7 @@ const CartPage: React.FC = () => {
                   <div className="border-t border-dashed border-gray-200 pt-4 mb-6">
                     <div className="flex justify-between text-xl font-bold text-brand-black">
                         <span>Total</span>
-                        <span>{pricedItemCount > 0 ? `₹${cartTotal.toLocaleString('en-IN')}` : 'Price on request'}</span>
+                        <span>{pricedItemCount > 0 ? formatRupees(cartTotal) : 'Price on request'}</span>
                     </div>
                     <p className="text-[10px] text-gray-400 mt-1 text-right">(Inclusive of all taxes)</p>
                   </div>

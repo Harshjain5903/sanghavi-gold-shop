@@ -5,6 +5,7 @@ interface UploadSignature {
   apiKey: string;
   timestamp: number;
   folder: string;
+  allowedFormats: string;
   signature: string;
 }
 
@@ -28,6 +29,7 @@ export async function uploadImage(file: File, target: 'products' | 'categories')
   form.append('api_key', sig.apiKey);
   form.append('timestamp', String(sig.timestamp));
   form.append('folder', sig.folder);
+  form.append('allowed_formats', sig.allowedFormats);
   form.append('signature', sig.signature);
 
   const response = await fetch(sig.uploadUrl, { method: 'POST', body: form });

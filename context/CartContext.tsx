@@ -1,8 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, CartItem } from '../types';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { CartItem, Product } from '../types';
 import { useAuth } from './AuthContext';
+import { useProducts } from './ProductContext';
+import { isPricedProduct } from '../lib/pricing';
+import { readJson, removeKey, writeJson } from '../lib/storage';
 
 interface CartContextType {
+  /** Bag lines joined with the live catalog, so prices are always today's prices. */
   items: CartItem[];
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
@@ -12,115 +16,103 @@ interface CartContextType {
   cartCount: number;
 }
 
+/** What is stored: only the product id and quantity. Prices are never stored in the browser. */
+interface CartLine {
+  id: string;
+  quantity: number;
+}
+
 const CartContext = createContext<CartContextType | undefined>(undefined);
 const GUEST_CART_KEY = 'sanghavi_cart_guest';
 const LEGACY_CART_KEY = 'sanghavi_cart';
+const MAX_QUANTITY = 20;
 
-const readCartFromStorage = (key: string): CartItem[] => {
-  const saved = localStorage.getItem(key);
-  if (!saved) return [];
-  try {
-    const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const migrateLegacyGuestCart = () => {
-  const alreadyMigrated = localStorage.getItem(GUEST_CART_KEY);
-  if (alreadyMigrated) return;
-  const legacy = localStorage.getItem(LEGACY_CART_KEY);
-  if (!legacy) return;
-  localStorage.setItem(GUEST_CART_KEY, legacy);
-  localStorage.removeItem(LEGACY_CART_KEY);
-};
-
-const mergeCartItems = (base: CartItem[], incoming: CartItem[]): CartItem[] => {
-  const map = new Map<string, CartItem>();
-  base.forEach(item => map.set(item.id, { ...item }));
-  incoming.forEach(item => {
-    const existing = map.get(item.id);
-    if (existing) {
-      map.set(item.id, { ...existing, quantity: existing.quantity + item.quantity });
-    } else {
-      map.set(item.id, { ...item });
-    }
+// Older versions stored whole product objects; keep only id + quantity from them.
+const readLines = (key: string): CartLine[] => {
+  const saved = readJson<unknown>(key, []);
+  if (!Array.isArray(saved)) return [];
+  return saved.flatMap((entry) => {
+    const id = entry && typeof entry === 'object' ? String((entry as CartLine).id ?? '') : '';
+    const quantity = Math.min(Math.max(Number((entry as CartLine)?.quantity) || 1, 1), MAX_QUANTITY);
+    return id ? [{ id, quantity }] : [];
   });
-  return Array.from(map.values());
+};
+
+const mergeLines = (base: CartLine[], incoming: CartLine[]): CartLine[] => {
+  const map = new Map(base.map((line) => [line.id, { ...line }]));
+  incoming.forEach((line) => {
+    const existing = map.get(line.id);
+    map.set(line.id, {
+      id: line.id,
+      quantity: Math.min((existing?.quantity ?? 0) + line.quantity, MAX_QUANTITY),
+    });
+  });
+  return [...map.values()];
 };
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
-  const [items, setItems] = useState<CartItem[]>([]);
+  const { user, loading: authLoading } = useAuth();
+  const { products, loading: productsLoading } = useProducts();
+  const [lines, setLines] = useState<CartLine[]>([]);
   const [storageKey, setStorageKey] = useState<string | null>(null);
 
-  // Load account-scoped cart. Migrate guest cart to user cart on first login.
+  // Load the account's bag; on sign-in, merge in anything added as a guest.
   useEffect(() => {
-    if (loading) return;
-
-    migrateLegacyGuestCart();
-
-    const nextKey = user?.uid ? `sanghavi_cart_${user.uid}` : GUEST_CART_KEY;
-    const scopedCart = readCartFromStorage(nextKey);
-
-    if (user?.uid) {
-      const guestCart = readCartFromStorage(GUEST_CART_KEY);
-      const merged = mergeCartItems(scopedCart, guestCart);
-      if (guestCart.length > 0) {
-        localStorage.removeItem(GUEST_CART_KEY);
-      }
-      setItems(merged);
-      setStorageKey(nextKey);
-      return;
+    if (authLoading) return;
+    const legacy = readLines(LEGACY_CART_KEY);
+    if (legacy.length) {
+      writeJson(GUEST_CART_KEY, mergeLines(readLines(GUEST_CART_KEY), legacy));
+      removeKey(LEGACY_CART_KEY);
     }
 
-    setItems(scopedCart);
-    setStorageKey(nextKey);
-  }, [user?.uid, loading]);
+    const key = user?.uid ? `sanghavi_cart_${user.uid}` : GUEST_CART_KEY;
+    let next = readLines(key);
+    if (user?.uid) {
+      const guest = readLines(GUEST_CART_KEY);
+      if (guest.length) {
+        next = mergeLines(next, guest);
+        removeKey(GUEST_CART_KEY);
+      }
+    }
+    setLines(next);
+    setStorageKey(key);
+  }, [user?.uid, authLoading]);
 
-  // Save cart to the active scope key.
   useEffect(() => {
-    if (!storageKey) return;
-    localStorage.setItem(storageKey, JSON.stringify(items));
-  }, [items, storageKey]);
+    if (storageKey) writeJson(storageKey, lines);
+  }, [lines, storageKey]);
+
+  // Drop lines for products that were deleted from the shop (only once the catalog has loaded).
+  useEffect(() => {
+    if (productsLoading || products.length === 0) return;
+    const known = new Set(products.map((p) => p.id));
+    setLines((prev) => (prev.every((line) => known.has(line.id)) ? prev : prev.filter((line) => known.has(line.id))));
+  }, [products, productsLoading]);
+
+  const items = useMemo<CartItem[]>(() => {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    return lines.flatMap((line) => {
+      const product = byId.get(line.id);
+      return product ? [{ ...product, quantity: line.quantity }] : [];
+    });
+  }, [lines, products]);
 
   const addToCart = (product: Product) => {
-    setItems(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => 
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prev, { ...product, quantity: 1 }];
-    });
+    setLines((prev) => mergeLines(prev, [{ id: product.id, quantity: 1 }]));
   };
 
   const removeFromCart = (productId: string) => {
-    setItems(prev => prev.filter(item => item.id !== productId));
+    setLines((prev) => prev.filter((line) => line.id !== productId));
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity < 1) return;
-    setItems(prev => prev.map(item => 
-      item.id === productId ? { ...item, quantity: quantity } : item
-    ));
+    if (quantity < 1 || quantity > MAX_QUANTITY) return;
+    setLines((prev) => prev.map((line) => (line.id === productId ? { ...line, quantity } : line)));
   };
 
-  const clearCart = () => setItems([]);
+  const clearCart = () => setLines([]);
 
-  const isPricedItem = (item: CartItem) => {
-    const displayMode = item.cardDisplayMode || 'price';
-    const isPriceOnRequest = item.priceOnRequest === true;
-    const hasPrice = item.price && item.price > 0;
-    return displayMode === 'price' && hasPrice && !isPriceOnRequest;
-  };
-
-  const cartTotal = items.reduce((total, item) => {
-    if (!isPricedItem(item)) return total;
-    return total + (item.price * item.quantity);
-  }, 0);
+  const cartTotal = items.reduce((total, item) => (isPricedProduct(item) ? total + item.price * item.quantity : total), 0);
   const cartCount = items.reduce((count, item) => count + item.quantity, 0);
 
   return (

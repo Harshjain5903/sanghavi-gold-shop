@@ -7,7 +7,8 @@ interface ProductContextType {
   loading: boolean;
   error: string;
   addProduct: (product: Product) => Promise<void>;
-  updateProduct: (updatedProduct: Product) => Promise<void>;
+  /** Pass refresh=false when saving many products in a row, then call refresh() once. */
+  updateProduct: (updatedProduct: Product, options?: { refresh?: boolean }) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   getProductById: (id: string) => Product | undefined;
   refresh: () => Promise<void>;
@@ -35,7 +36,8 @@ const toProductInput = (product: Product) => {
     images,
     videos: product.videos || [],
     specifications: (product.specifications || []).filter((s) => s.key.trim() || s.value.trim()),
-    weight: product.weight || '',
+    // Send back the admin's own label, not the displayed weight (which may be computed from net weight).
+    weight: product.weightLabel !== undefined ? product.weightLabel ?? '' : product.weight || '',
     cardDisplayMode: product.cardDisplayMode || 'price',
     inStock: product.inStock !== false,
     isNew: !!product.isNew,
@@ -71,12 +73,12 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await refresh();
   };
 
-  const updateProduct = async (updatedProduct: Product) => {
+  const updateProduct = async (updatedProduct: Product, options: { refresh?: boolean } = {}) => {
     await apiFetch(`/products/${encodeURIComponent(updatedProduct.id)}`, {
       method: 'PUT',
       body: JSON.stringify(toProductInput(updatedProduct)),
     });
-    await refresh();
+    if (options.refresh !== false) await refresh();
   };
 
   const deleteProduct = async (id: string) => {

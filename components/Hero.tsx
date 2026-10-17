@@ -101,7 +101,9 @@ const Hero: React.FC = () => {
   }
 
   // --- DYNAMIC CAROUSEL ---
-  const currentSlide = slides[currentIndex];
+  // The featured list can shrink while the page is open (admin un-features a product): never index past the end.
+  const safeIndex = currentIndex < slides.length ? currentIndex : 0;
+  const currentSlide = slides[safeIndex];
 
   return (
     // Outer Wrapper - Adds padding on mobile for the "Card" look
@@ -202,8 +204,9 @@ const Hero: React.FC = () => {
                 <button
                     key={idx}
                     onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
+                    aria-label={`Show slide ${idx + 1}`}
                     className={`transition-all duration-300 rounded-full shadow-sm ${
-                    idx === currentIndex 
+                    idx === safeIndex 
                         ? 'bg-white w-6 h-1.5 md:w-8 md:h-2' 
                         : 'bg-white/40 w-1.5 h-1.5 md:w-2 md:h-2 hover:bg-white/60'
                     }`}

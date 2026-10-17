@@ -1,7 +1,7 @@
-import { Category, Product, ShopInfo, NavItem } from './types';
+import { Category, Product, ShopInfo, NavItem, MetalRates } from './types';
 import { Truck, ShieldCheck, Phone, Zap } from 'lucide-react';
 
-export const DEFAULT_METAL_RATES = {
+export const DEFAULT_METAL_RATES: MetalRates = {
   gold22k: 0,
   gold24k: 0,
   gold18k: 0,
@@ -10,6 +10,12 @@ export const DEFAULT_METAL_RATES = {
   silverDisplayUnit: '1kg',
   updatedAt: ''
 };
+
+/**
+ * Google Business Profile rating shown on the home page. Not fetched live:
+ * update these two numbers from the shop's Google listing when they change.
+ */
+export const GOOGLE_REVIEWS = { rating: 5.0, count: 210 };
 
 export const SHOP_INFO: ShopInfo = {
   name: "Sanghavi Gold",

@@ -56,7 +56,9 @@ export interface Product {
   image: string; // Keep for backward compatibility (serves as primary image)
   images?: string[]; // New: Multiple images support
   videos?: string[]; // Optional: Product videos
-  weight?: string; // Legacy support
+  weight?: string; // Weight to display on cards
+  /** The admin's own weight label (null = show net weight). Present on products from the API. */
+  weightLabel?: string | null;
   purity?: string; // Legacy support
   specifications?: ProductSpecification[]; // New Dynamic Specs
   description: string;

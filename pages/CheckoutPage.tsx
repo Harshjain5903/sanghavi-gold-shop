@@ -4,11 +4,16 @@ import { MessageCircle, Video, Phone, MapPin, Instagram, Facebook, Youtube, Shie
 import { useCart } from '../context/CartContext';
 import { useRates } from '../context/RatesContext';
 import { SHOP_INFO } from '../constants';
+import { formatRateByUnit, formatRupees, hasAnyRate, isPricedProduct, priceLabel } from '../lib/pricing';
+import { itemsMessage, openWhatsApp as openWhatsAppMessage } from '../lib/whatsapp';
+import { usePageTitle } from '../lib/usePageTitle';
 
 const CheckoutPage: React.FC = () => {
   const { items, cartTotal } = useCart();
   const { rates } = useRates();
   const navigate = useNavigate();
+
+  usePageTitle('Checkout');
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -19,80 +24,11 @@ const CheckoutPage: React.FC = () => {
 
   if (items.length === 0) return null;
 
-  const hasRates = rates.gold22k > 0 || rates.gold24k > 0 || rates.gold18k > 0 || rates.silver > 0;
-  const formatByUnit = (value: number, unit: '1g' | '10g' | '100g' | '1kg') => {
-    if (!value || value <= 0) return '--';
-    const multiplier = unit === '10g' ? 10 : unit === '100g' ? 100 : unit === '1kg' ? 1000 : 1;
-    const label = unit === '1kg' ? 'kg' : unit;
-    return `₹${(value * multiplier).toLocaleString('en-IN')}/${label}`;
-  };
+  const hasRates = hasAnyRate(rates);
+  const openWhatsApp = (action: 'inquiry' | 'video') => openWhatsAppMessage(itemsMessage(items, action, 'bag'));
 
-  const isPricedItem = (item: (typeof items)[number]) => {
-    const displayMode = item.cardDisplayMode || 'price';
-    const isPriceOnRequest = item.priceOnRequest === true;
-    const hasPrice = item.price && item.price > 0;
-    return displayMode === 'price' && hasPrice && !isPriceOnRequest;
-  };
-
-  const getItemPriceLabel = (item: (typeof items)[number]) => {
-    const displayMode = item.cardDisplayMode || 'price';
-    const isPriceOnRequest = item.priceOnRequest === true;
-    const hasPrice = item.price && item.price > 0;
-    const showWeight = displayMode === 'weight' && item.weight && item.weight.trim().length > 0;
-
-    if (displayMode === 'price' && hasPrice && !isPriceOnRequest) {
-      return `₹${item.price.toLocaleString('en-IN')}`;
-    }
-    if (showWeight) {
-      return `Wt: ${item.weight}`;
-    }
-    return 'Price on request';
-  };
-
-  const buildInquiryMessage = (action: 'inquiry' | 'video') => {
-    const targetItems = items;
-    let message = `Hi Sanghavi Gold, I would like to ${action === 'video' ? 'request a VIDEO CALL' : 'INQUIRE'} about the following items from my bag:\n\n`;
-
-    targetItems.forEach((item, index) => {
-      const itemUrl = `${window.location.origin}/#/product/${item.id}`;
-      message += `${index + 1}. *${item.name}*\n`;
-      message += `   Code: ${item.id}\n`;
-      message += `   Qty: ${item.quantity}\n`;
-      if (isPricedItem(item)) {
-        message += `   Price: ₹${item.price.toLocaleString('en-IN')}\n`;
-      } else {
-        message += '   Price: On request\n';
-      }
-      if (item.weight) message += `   Weight: ${item.weight}\n`;
-      if (item.purity) message += `   Purity: ${item.purity}\n`;
-      message += `   Link: ${itemUrl}\n\n`;
-    });
-
-    const totalVal = targetItems
-      .filter(isPricedItem)
-      .reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
-    if (totalVal > 0) {
-      message += `Total Selected Value (priced items): ₹${totalVal.toLocaleString('en-IN')}\n\n`;
-    } else {
-      message += 'Total Selected Value: Price on request\n\n';
-    }
-
-    if (action === 'video') {
-      message += 'Please let me know when we can connect for a live viewing.';
-    } else {
-      message += 'Can you please confirm availability?';
-    }
-
-    return message;
-  };
-
-  const openWhatsApp = (action: 'inquiry' | 'video') => {
-    const message = buildInquiryMessage(action);
-    window.open(`https://wa.me/${SHOP_INFO.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
-  };
-
-  const pricedItemCount = items.reduce((count, item) => count + (isPricedItem(item) ? item.quantity : 0), 0);
-  const unpricedItemCount = items.reduce((count, item) => count + (!isPricedItem(item) ? item.quantity : 0), 0);
+  const pricedItemCount = items.reduce((count, item) => count + (isPricedProduct(item) ? item.quantity : 0), 0);
+  const unpricedItemCount = items.reduce((count, item) => count + (!isPricedProduct(item) ? item.quantity : 0), 0);
   const hasUnpricedItems = unpricedItemCount > 0;
 
   const mapUrl = 'https://www.google.com/maps/place/SANGHAVI+GOLD+KALYAN/@19.2387693,73.1289198,17z/data=!3m1!4b1!4m6!3m5!1s0x3be7958fd45a3135:0xae4bd5a000116613!8m2!3d19.2387693!4d73.1314947!16s%2Fg%2F11v6k8vs4v?entry=ttu&g_ep=EgoyMDI2MDIwNC4wIKXMDSoKLDEwMDc5MjA2OUgBUAM%3D';
@@ -170,15 +106,15 @@ const CheckoutPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                 <div className="p-4 rounded-lg bg-gray-50 border border-gray-100">
                   <p className="text-xs text-gray-500 uppercase tracking-wider">Gold 22kt</p>
-                  <p className="text-lg font-bold text-gray-900 mt-1">{formatByUnit(rates.gold22k, rates.goldDisplayUnit || '10g')}</p>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatRateByUnit(rates.gold22k, rates.goldDisplayUnit || '10g')}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-gray-50 border border-gray-100">
                   <p className="text-xs text-gray-500 uppercase tracking-wider">Gold 24kt</p>
-                  <p className="text-lg font-bold text-gray-900 mt-1">{formatByUnit(rates.gold24k, rates.goldDisplayUnit || '10g')}</p>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatRateByUnit(rates.gold24k, rates.goldDisplayUnit || '10g')}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-gray-50 border border-gray-100">
                   <p className="text-xs text-gray-500 uppercase tracking-wider">Silver</p>
-                  <p className="text-lg font-bold text-gray-900 mt-1">{formatByUnit(rates.silver, rates.silverDisplayUnit || '1kg')}</p>
+                  <p className="text-lg font-bold text-gray-900 mt-1">{formatRateByUnit(rates.silver, rates.silverDisplayUnit || '1kg')}</p>
                 </div>
               </div>
             </div>
@@ -192,12 +128,12 @@ const CheckoutPage: React.FC = () => {
               {items.map(item => (
                 <div key={item.id} className="flex gap-3">
                   <div className="w-16 h-16 bg-gray-50 rounded overflow-hidden flex-shrink-0">
-                    <img src={item.image} className="w-full h-full object-cover" />
+                    <img src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover" />
                   </div>
                   <div>
                     <p className="text-sm font-bold line-clamp-2 text-gray-800">{item.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">Qty: {item.quantity}</p>
-                    <p className="text-sm font-bold mt-1">{getItemPriceLabel(item)}</p>
+                    <p className="text-sm font-bold mt-1">{priceLabel(item)}</p>
                   </div>
                 </div>
               ))}
@@ -205,7 +141,7 @@ const CheckoutPage: React.FC = () => {
             <div className="border-t border-dashed border-gray-200 pt-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal (priced items{pricedItemCount > 0 ? `: ${pricedItemCount}` : ''})</span>
-                <span className="font-bold">{pricedItemCount > 0 ? `₹${cartTotal.toLocaleString('en-IN')}` : 'Price on request'}</span>
+                <span className="font-bold">{pricedItemCount > 0 ? formatRupees(cartTotal) : 'Price on request'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Shipping</span>
@@ -213,7 +149,7 @@ const CheckoutPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-3 mt-2">
                 <span>Total</span>
-                <span>{pricedItemCount > 0 ? `₹${cartTotal.toLocaleString('en-IN')}` : 'Price on request'}</span>
+                <span>{pricedItemCount > 0 ? formatRupees(cartTotal) : 'Price on request'}</span>
               </div>
             </div>
             {hasUnpricedItems && (

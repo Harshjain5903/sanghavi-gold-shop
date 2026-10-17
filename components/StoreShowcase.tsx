@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, Navigation, Star, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { GOOGLE_REVIEWS } from '../constants';
 
 // Images Array - defined outside to be static
 // Added a 4th image to ensure the "4 photos" requirement is met for the gallery scroll
@@ -11,11 +12,7 @@ const STORE_IMAGES = [
 ];
 
 const StoreShowcase: React.FC = () => {
-  // State for reviews (Prepared for API integration)
-  const [reviewData] = useState({
-    rating: 5.0,
-    count: 210
-  });
+  const reviewData = GOOGLE_REVIEWS;
 
   // Lightbox State
   const [lightboxOpen, setLightboxOpen] = useState(false);

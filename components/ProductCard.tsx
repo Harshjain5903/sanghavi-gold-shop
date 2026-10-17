@@ -1,8 +1,10 @@
 import React from 'react';
 import { Product } from '../types';
 import { MessageCircle, ShoppingBag, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { SHOP_INFO } from '../constants';
+import { Link } from 'react-router-dom';
+import { formatRupees } from '../lib/pricing';
+import { openWhatsApp, productInquiryMessage } from '../lib/whatsapp';
+import { notify } from './ui/Toaster';
 import { useCart } from '../context/CartContext';
 
 interface ProductCardProps {
@@ -10,25 +12,14 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const navigate = useNavigate();
   const { addToCart } = useCart();
+  const productPath = `/product/${encodeURIComponent(product.id)}`;
 
-  const handleCardClick = () => {
-    navigate(`/product/${product.id}`);
-  };
+  const handleQuickInquire = () => openWhatsApp(productInquiryMessage(product));
 
-  const handleQuickInquire = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const currentUrl = `${window.location.origin}/#/product/${product.id}`;
-    const message = `Hi Sanghavi Gold, I saw this product: *${product.name}* (Code: ${product.id}). Link: ${currentUrl}. Can I know the price?`;
-    window.open(`https://wa.me/${SHOP_INFO.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
-  };
-
-  const handleAddToBag = (e: React.MouseEvent) => {
-      e.stopPropagation();
+  const handleAddToBag = () => {
       addToCart(product);
-      // Optional: Add toast or visual feedback here
-      alert("Added to Bag!");
+      notify(`${product.name} added to your bag.`, 'success');
   };
 
   const discount = product.originalPrice 
@@ -45,15 +36,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const showWeight = displayMode === 'weight' && product.weight && product.weight.trim().length > 0;
 
   return (
-    <div 
-      className="bg-white rounded-lg hover:shadow-xl transition-all duration-300 border border-transparent hover:border-gray-100 group cursor-pointer relative flex flex-col h-full overflow-hidden"
-      onClick={handleCardClick}
-    >
+    <div className="bg-white rounded-lg hover:shadow-xl transition-all duration-300 border border-transparent hover:border-gray-100 group relative flex flex-col h-full overflow-hidden">
       {/* Image */}
       <div className="relative aspect-square overflow-hidden rounded-t-lg bg-gray-50 flex-shrink-0">
         <img 
           src={product.image} 
           alt={product.name} 
+          loading="lazy"
+          decoding="async"
           className={`w-full h-full object-cover transform transition duration-700 ${isOutOfStock ? 'grayscale opacity-60' : 'group-hover:scale-105'}`}
         />
         {/* Badges */}
@@ -79,9 +69,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
              {showPrice ? (
                  <>
                     <div className="flex flex-wrap items-baseline gap-1 md:gap-2">
-                        <span className="text-base md:text-lg font-bold text-gray-900 whitespace-nowrap">₹{product.price.toLocaleString('en-IN')}</span>
+                        <span className="text-base md:text-lg font-bold text-gray-900 whitespace-nowrap">{formatRupees(product.price)}</span>
                         {product.originalPrice && (
-                            <span className="text-[10px] md:text-xs text-gray-500 line-through whitespace-nowrap">₹{product.originalPrice.toLocaleString('en-IN')}</span>
+                            <span className="text-[10px] md:text-xs text-gray-500 line-through whitespace-nowrap">{formatRupees(product.originalPrice)}</span>
                         )}
                     </div>
                     {discount > 0 && (
@@ -99,11 +89,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* Product Title - Added break-words and line-clamp handling */}
         <h3 className="text-gray-600 font-sans text-xs md:text-sm leading-snug mb-2 group-hover:text-brand-black transition-colors break-words line-clamp-2" title={product.name}>
-            {product.name}
+            {/* The link covers the whole card (after:inset-0), so the card is a real, crawlable, keyboard-friendly link. */}
+            <Link to={productPath} className="after:absolute after:inset-0 after:content-[''] focus:outline-none focus-visible:underline">
+                {product.name}
+            </Link>
         </h3>
 
         {/* Actions - Add to Bag Focus */}
-        <div className="mt-auto pt-2 flex gap-2">
+        <div className="mt-auto pt-2 flex gap-2 relative z-20">
             <button 
                 className={`flex-1 py-2 bg-brand-black text-white text-[10px] md:text-xs font-bold rounded hover:bg-gold-600 transition uppercase flex items-center justify-center gap-1 ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-400 hover:bg-gray-400' : ''}`}
                 onClick={handleAddToBag}
@@ -114,6 +107,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             
             <button 
                 onClick={handleQuickInquire}
+                aria-label={`Ask about ${product.name} on WhatsApp`}
                 className="py-2 px-3 border border-gray-200 text-gray-500 rounded hover:border-brand-black hover:text-brand-black transition flex-shrink-0"
             >
                 <MessageCircle size={16} />

@@ -1,5 +1,6 @@
 import React from 'react';
 import { SHOP_INFO } from '../constants';
+import { whatsappUrl } from '../lib/whatsapp';
 import { MapPin, Phone, Mail, Instagram, Facebook, Lock, Twitter, Youtube, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -16,11 +17,9 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="text-sm font-bold mb-4 text-brand-black uppercase tracking-wider">Know Your Jewellery</h4>
             <ul className="space-y-2 text-xs text-gray-600">
-              <li><Link to="/collections" className="hover:text-gold-600">DIAMOND GUIDE</Link></li>
-              <li><Link to="/collections" className="hover:text-gold-600">JEWELLERY GUIDE</Link></li>
-              <li><Link to="/collections" className="hover:text-gold-600">GEMSTONE GUIDE</Link></li>
-              <li><Link to="/collections" className="hover:text-gold-600">GOLD RATE</Link></li>
-              <li><Link to="/collections" className="hover:text-gold-600">DIGITAL GOLD</Link></li>
+              <li><Link to="/info/gold-rate" className="hover:text-gold-600">TODAY'S GOLD RATE</Link></li>
+              <li><Link to="/collections" className="hover:text-gold-600">ALL JEWELLERY</Link></li>
+              <li><Link to="/collections?category=Silver" className="hover:text-gold-600">SILVER</Link></li>
             </ul>
           </div>
 
@@ -28,8 +27,8 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="text-sm font-bold mb-4 text-brand-black uppercase tracking-wider">Sanghavi Advantage</h4>
             <ul className="space-y-2 text-xs text-gray-600">
-              <li><Link to="/" className="hover:text-gold-600">OLD GOLD EXCHANGE</Link></li>
-              <li><Link to="/" className="hover:text-gold-600">VIDEO CONSULTATION</Link></li>
+              <li><a href={whatsappUrl('Hi Sanghavi Gold, I would like to know about exchanging my old gold.')} target="_blank" rel="noreferrer" className="hover:text-gold-600">OLD GOLD EXCHANGE</a></li>
+              <li><a href={whatsappUrl('Hi Sanghavi Gold, I would like to book a video consultation.')} target="_blank" rel="noreferrer" className="hover:text-gold-600">VIDEO CONSULTATION</a></li>
             </ul>
           </div>
 
@@ -37,10 +36,9 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="text-sm font-bold mb-4 text-brand-black uppercase tracking-wider">Customer Service</h4>
             <ul className="space-y-2 text-xs text-gray-600">
-              <li><Link to="/" className="hover:text-gold-600">RETURN POLICY</Link></li>
-              <li><Link to="/" className="hover:text-gold-600">ORDER STATUS</Link></li>
-              <li><Link to="/" className="hover:text-gold-600">FAQ</Link></li>
-              <li><Link to="/" className="hover:text-gold-600">CONTACT US</Link></li>
+              <li><Link to="/info/returns" className="hover:text-gold-600">RETURNS &amp; EXCHANGE</Link></li>
+              <li><Link to="/info/shipping" className="hover:text-gold-600">DELIVERY</Link></li>
+              <li><Link to="/info/contact" className="hover:text-gold-600">CONTACT US</Link></li>
             </ul>
           </div>
 
@@ -107,11 +105,11 @@ const Footer: React.FC = () => {
            </div>
            
            <div className="text-xs text-gray-500 text-center md:text-right">
-              <p>&copy; 2025 {SHOP_INFO.name}. All rights reserved. <span className="opacity-50">v2.3</span></p>
+              <p>&copy; {new Date().getFullYear()} {SHOP_INFO.name}. All rights reserved.</p>
               <div className="mt-2 space-x-2">
-                 <a href="#" className="hover:text-brand-black">Privacy Policy</a>
+                 <Link to="/info/privacy" className="hover:text-brand-black">Privacy Policy</Link>
                  <span>|</span>
-                 <a href="#" className="hover:text-brand-black">Terms of Service</a>
+                 <Link to="/info/terms" className="hover:text-brand-black">Terms of Use</Link>
               </div>
            </div>
         </div>

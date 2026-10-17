@@ -25,13 +25,16 @@ import { SanghaviLogo } from '../components/Navbar';
 import { InputModal, ConfirmModal } from '../components/AdminModals';
 import { AdminRole, checkAdminAccess } from '../lib/adminAuth';
 import TeamManager from '../components/admin/TeamManager';
+import { notify } from '../components/ui/Toaster';
 
 // --- COMPONENTS ---
+
+type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
 
 interface StatCardProps {
   title: string;
   value: string | number;
-  icon: any;
+  icon: IconComponent;
   color: string;
   onClick: () => void;
   subtitle?: string;
@@ -56,7 +59,14 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color, on
   </div>
 );
 
-const ActionCard = ({ title, icon: Icon, onClick, color }: any) => (
+interface ActionCardProps {
+  title: string;
+  icon: IconComponent;
+  onClick: () => void;
+  color: string;
+}
+
+const ActionCard = ({ title, icon: Icon, onClick, color }: ActionCardProps) => (
     <button 
         onClick={onClick}
         className="flex flex-col items-center justify-center p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95 h-full w-full"
@@ -69,7 +79,7 @@ const ActionCard = ({ title, icon: Icon, onClick, color }: any) => (
 );
 
 const AdminPage: React.FC = () => {
-  const { products, addProduct, updateProduct, deleteProduct, refresh: refreshProducts } = useProducts();
+  const { products, loading: productsLoading, error: productsError, addProduct, updateProduct, deleteProduct, refresh: refreshProducts } = useProducts();
   const { categories, saveCategories } = useCategories();
     const { sortOptions, saveSortOptions, resetToDefault: resetSortOptions } = useSortOptions();
     const { filterSections, saveFilterSections, resetToDefault: resetFilterOptions } = useFilterOptions();
@@ -89,7 +99,7 @@ const AdminPage: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [uploading, setUploading] = useState(false);
   const [managerSearch, setManagerSearch] = useState('');
-  const [dbStatus, setDbStatus] = useState<'connecting' | 'connected'>('connecting');
+  const [dbStatus, setDbStatus] = useState<'connecting' | 'connected' | 'offline'>('connecting');
   
   // MOBILE MENU STATE
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -206,15 +216,10 @@ const AdminPage: React.FC = () => {
         syncRatesInputs(rates || DEFAULT_METAL_RATES, goldUnit, silverUnit);
     }, [goldUnit, silverUnit]);
 
-  // Database Connection Mock
+  // Real connection status: based on whether the catalog loaded from the server.
   useEffect(() => {
-    if (products.length > 0 || categories.length > 0) {
-        setDbStatus('connected');
-    } else {
-        const timer = setTimeout(() => setDbStatus('connected'), 1500);
-        return () => clearTimeout(timer);
-    }
-  }, [products, categories]);
+    setDbStatus(productsError ? 'offline' : productsLoading ? 'connecting' : 'connected');
+  }, [productsError, productsLoading]);
 
     // --- ADMIN LOGIN ---
     // Staff sign in only with their own Google account (no shared passwords).
@@ -324,10 +329,10 @@ const AdminPage: React.FC = () => {
 
         let best: { label: string; score: number } | null = null;
 
-        allSubcategoryItems.forEach(label => {
+        for (const label of allSubcategoryItems) {
             const labelNorm = normalizeText(label);
             const labelTokens = labelNorm.split(' ').filter(t => t.length > 2).map(singularize);
-            if (labelTokens.length === 0) return;
+            if (labelTokens.length === 0) continue;
 
             let score = 0;
             labelTokens.forEach(token => {
@@ -341,7 +346,7 @@ const AdminPage: React.FC = () => {
             if (!best || score > best.score) {
                 best = { label, score };
             }
-        });
+        }
 
         return best && best.score >= 30 ? best.label : '';
     };
@@ -378,7 +383,7 @@ const AdminPage: React.FC = () => {
         await updateProduct({ ...product, isTrending: status });
     } catch (e) {
         console.error(e);
-        alert("Failed to update trending status");
+        notify("Failed to update trending status", 'error');
     }
   };
 
@@ -387,7 +392,7 @@ const AdminPage: React.FC = () => {
         await updateProduct({ ...product, isFeaturedCollection: status });
     } catch (e) {
         console.error(e);
-        alert("Failed to update collection status");
+        notify("Failed to update collection status", 'error');
     }
   };
 
@@ -444,7 +449,7 @@ const AdminPage: React.FC = () => {
             }
         } catch (error: any) {
             console.error("Error uploading image:", error);
-            alert(`⚠️ Upload failed: ${(error as Error)?.message || 'please try again.'}`);
+            notify(`Upload failed: ${(error as Error)?.message || 'please try again.'}`, 'error');
         } finally {
             setUploading(false);
             if (e.target) {
@@ -502,16 +507,16 @@ const AdminPage: React.FC = () => {
 
       if (activeTab === 'add') {
         await addProduct(finalData);
-        alert('✅ Product Added Successfully!');
+        notify('Product Added Successfully!', 'success');
       } else if (activeTab === 'edit' && editingProduct) {
         await updateProduct(finalData);
-        alert('✅ Product Updated Successfully!');
+        notify('Product Updated Successfully!', 'success');
       }
       setActiveTab('products');
       setFormData(initialFormState);
     } catch (error) {
-      alert("Error saving product.");
       console.error(error);
+      notify(`Could not save the product: ${(error as Error)?.message || 'please try again.'}`, 'error');
     }
   };
 
@@ -534,7 +539,8 @@ const AdminPage: React.FC = () => {
         imgs = [product.image];
     }
     const vids = product.videos || [];
-    setFormData({ ...product, specifications: specs, images: imgs, videos: vids, priceOnRequest: product.priceOnRequest || false });
+    // Edit the admin's own weight label (not the displayed weight), so saving doesn't change it.
+    setFormData({ ...product, weight: product.weightLabel ?? product.weight ?? '', weightLabel: undefined, specifications: specs, images: imgs, videos: vids, priceOnRequest: product.priceOnRequest || false });
     setActiveTab('edit');
   };
 
@@ -583,7 +589,7 @@ const AdminPage: React.FC = () => {
       setTargetIndex(null);
     } catch (error) {
       console.error("Error updating categories:", error);
-      alert("Failed to save changes.");
+      notify("Failed to save changes.", 'error');
     }
   };
 
@@ -622,10 +628,10 @@ const AdminPage: React.FC = () => {
   const handleSaveOrder = async () => {
       try {
           await saveCategories(localCategories);
-          alert("✅ Category order updated successfully on live website!");
+          notify("Category order updated successfully on live website!", 'success');
       } catch (e) {
           console.error(e);
-          alert("Failed to save order.");
+          notify("Failed to save order.", 'error');
       }
   };
 
@@ -661,10 +667,10 @@ const AdminPage: React.FC = () => {
       try {
           const cleaned = localSortOptions.map(opt => opt.trim()).filter(Boolean);
           await saveSortOptions(cleaned);
-          alert('✅ Sort options updated successfully.');
+          notify('Sort options updated successfully.', 'success');
       } catch (e) {
           console.error(e);
-          alert('Failed to save sort options.');
+          notify('Failed to save sort options.', 'error');
       }
   };
 
@@ -732,10 +738,10 @@ const AdminPage: React.FC = () => {
               }))
               .filter(section => section.title && section.items.length > 0);
           await saveFilterSections(cleaned);
-          alert('✅ Filter options updated successfully.');
+          notify('Filter options updated successfully.', 'success');
       } catch (e) {
           console.error(e);
-          alert('Failed to save filter options.');
+          notify('Failed to save filter options.', 'error');
       }
   };
 
@@ -786,7 +792,7 @@ const AdminPage: React.FC = () => {
     const autoTagMissingSubcategories = async () => {
         const candidates = products.filter(p => !p.subcategory || !p.subcategory.trim());
         if (candidates.length === 0) {
-            alert('All products already have subcategories.');
+            notify('All products already have subcategories.', 'info');
             return;
         }
 
@@ -798,11 +804,12 @@ const AdminPage: React.FC = () => {
         for (const product of candidates) {
             const detected = detectSubcategory(product);
             if (!detected) continue;
-            await updateProduct({ ...product, subcategory: detected });
+            await updateProduct({ ...product, subcategory: detected }, { refresh: false });
             updatedCount += 1;
         }
+        await refreshProducts();
 
-        alert(`Auto-tagged ${updatedCount} products.`);
+        notify(`Auto-tagged ${updatedCount} products.`, 'success');
     };
 
     const smartSyncAllTags = async () => {
@@ -821,12 +828,13 @@ const AdminPage: React.FC = () => {
                     ...product,
                     category: categoriesChanged ? nextCategories : product.category,
                     subcategory: subcategoryChanged ? detectedSub : product.subcategory
-                });
+                }, { refresh: false });
                 updatedCount += 1;
             }
         }
+        await refreshProducts();
 
-        alert(`Smart sync complete. Updated ${updatedCount} products.`);
+        notify(`Smart sync complete. Updated ${updatedCount} products.`, 'success');
     };
 
     const applySuggestedTags = async (product: Product) => {
@@ -839,7 +847,7 @@ const AdminPage: React.FC = () => {
         const subcategoryChanged = !!detectedSub && detectedSub !== product.subcategory;
 
         if (!categoriesChanged && !subcategoryChanged) {
-            alert('No new tags found for this product.');
+            notify('No new tags found for this product.', 'info');
             return;
         }
 
@@ -851,7 +859,7 @@ const AdminPage: React.FC = () => {
 
         const categoryLabel = categoriesChanged ? nextCategories.join(', ') : (product.category || []).join(', ');
         const subLabel = subcategoryChanged ? detectedSub : (product.subcategory || '');
-        alert(`Tags updated.\nCategory: ${categoryLabel || 'None'}\nSubcategory: ${subLabel || 'None'}`);
+        notify(`Tags updated.\nCategory: ${categoryLabel || 'None'}\nSubcategory: ${subLabel || 'None'}`, 'success');
     };
 
   const trendingProducts = products.filter(p => p.isTrending);
@@ -935,8 +943,8 @@ const AdminPage: React.FC = () => {
         
         <div className="px-6 py-2">
             <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${dbStatus === 'connected' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                <span className="text-xs text-gray-500 font-medium">{dbStatus === 'connected' ? 'Online' : 'Connecting...'}</span>
+                <div className={`w-2 h-2 rounded-full ${dbStatus === 'connected' ? 'bg-green-500' : dbStatus === 'offline' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
+                <span className="text-xs text-gray-500 font-medium">{dbStatus === 'connected' ? 'Online' : dbStatus === 'offline' ? 'Server unreachable' : 'Connecting...'}</span>
             </div>
         </div>
 
@@ -1123,8 +1131,8 @@ const AdminPage: React.FC = () => {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                         <ActionCard title="Add New Product" icon={Plus} color="bg-green-500" onClick={() => { setFormData(initialFormState); setActiveTab('add'); }} />
                         <ActionCard title="Manage Categories" icon={List} color="bg-blue-500" onClick={() => setActiveTab('categories')} />
-                        <ActionCard title="View All Orders" icon={Store} color="bg-purple-500" onClick={() => alert("Orders module coming soon!")} />
-                        <ActionCard title="Store Settings" icon={Settings} color="bg-gray-500" onClick={() => alert("Settings module coming soon!")} />
+                        <ActionCard title="View All Orders" icon={Store} color="bg-purple-500" onClick={() => notify("Orders module coming soon!", 'info')} />
+                        <ActionCard title="Store Settings" icon={Settings} color="bg-gray-500" onClick={() => notify("Settings module coming soon!", 'info')} />
                     </div>
                 </div>
 
